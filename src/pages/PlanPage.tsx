@@ -7,7 +7,7 @@ import { useActivePlan } from '../hooks/useActivePlan'
 import { useConfirm, useToast } from '../components/Feedback'
 import { Modal } from '../components/Modal'
 import { RouteMap } from '../components/RouteMap'
-import { DayBoard, buildStays } from '../components/DayBoard'
+import { DayBoard, buildStays, DirToggle } from '../components/DayBoard'
 import { Select } from '../components/Select'
 import { DatePicker } from '../components/DatePicker'
 import { PlanPrintSheet } from '../components/PlanPrintSheet'
@@ -15,7 +15,7 @@ import { PlanHelpSheet } from '../components/PlanHelpSheet'
 import { collectHotels, suggestPrevNight } from '../lib/stayMatch'
 import { stayName } from '../lib/stayName'
 import type { PlanMapStayMode } from '../lib/storage'
-import type { Hotel } from '../types'
+import type { GeoPoint, Hotel } from '../types'
 import {
   DAY_HOURS_LIMIT,
   DAY_KM_LIMIT,
@@ -23,6 +23,8 @@ import {
   planDayNumbers,
   planDays,
   planRows,
+  routeEnds,
+  stayIdOfDay,
   unassignedRows,
 } from '../lib/dayPlan'
 import { OLLE_TOTAL_KM } from '../lib/seed'
@@ -84,6 +86,7 @@ export function PlanPage() {
     lockStay,
     addDay,
     removeDay,
+    setDirection,
   } = planApi
   const toast = useToast()
   const confirm = useConfirm()
@@ -122,7 +125,23 @@ export function PlanPage() {
   const hotels = useMemo(() => collectHotels(routes), [routes])
 
   const dayRows = useMemo(() => planRows(plan, routes, metrics), [plan, routes, metrics])
-  const days = useMemo(() => planDays(plan, dayRows, metrics), [plan, dayRows, metrics])
+  /**
+   * 每天锁定的住宿坐标（day → 坐标）：喂给 planDays，让它算「接驳断口」时从住宿点起算，
+   * 而不是从当天路线终点起算 —— 你人睡在旅馆，不在路线终点。某天没选住宿就不进这张表，
+   * planDays 会回退到路线终点。用 planDayNumbers 拿天号，不依赖 days，避免和 days 互相套圈。
+   */
+  const dayStayGeo = useMemo(() => {
+    const m = new Map<number, GeoPoint>()
+    const itemsArr = plan?.items ?? []
+    for (const d of planDayNumbers(plan)) {
+      const id = stayIdOfDay(itemsArr, d)
+      if (!id) continue
+      const lh = hotels.find((h) => h.hotel.id === id)
+      if (lh) m.set(d, { lng: lh.hotel.lng, lat: lh.hotel.lat })
+    }
+    return m
+  }, [plan, hotels])
+  const days = useMemo(() => planDays(plan, dayRows, metrics, dayStayGeo), [plan, dayRows, metrics, dayStayGeo])
   const stays = useMemo(() => buildStays(days, plan?.items ?? [], hotels), [days, plan, hotels])
   const backlog = useMemo(() => unassignedRows(dayRows), [dayRows])
   const firstDay = useMemo(() => days.find((d) => d.rows.length > 0), [days])
@@ -342,9 +361,11 @@ export function PlanPage() {
     /* 出发前一晚：不归任何一天，单独一节放在最前面 */
     if (firstDay) {
       const head = prevLabel ? ` · ${prevLabel}` : ''
+      const fr = firstDay.rows[0]
+      const startName = routeEnds(fr.route, metrics.get(fr.route.id), fr.item.direction).start?.name ?? fr.route.name
       lines.push(`## 出发前一晚${head}`, '')
       lines.push(
-        `次日要从「${firstDay.rows[0].route.startPoint?.name ?? firstDay.rows[0].route.name}」开走。`,
+        `次日要从「${startName}」开走。`,
         '',
       )
       if (prevNight) {
@@ -362,9 +383,9 @@ export function PlanPage() {
       lines.push(`## 第 ${d.day} 天${tail} · ${formatKm(d.distanceKm)} km`, '')
       lines.push('| 序 | 路线 | 里程 | 起点 → 终点 |', '| --- | --- | --- | --- |')
       d.rows.forEach((r, i) => {
-        const pts = r.route.points ?? []
-        const from = pts[0]?.name ?? '—'
-        const to = pts[pts.length - 1]?.name ?? '—'
+        const ends = routeEnds(r.route, metrics.get(r.route.id), r.item.direction)
+        const from = ends.start?.name ?? '—'
+        const to = ends.end?.name ?? '—'
         lines.push(`| ${i + 1} | ${r.route.name} | ${formatKm(r.km)} | ${from} → ${to} |`)
       })
       lines.push('')
@@ -672,6 +693,7 @@ export function PlanPage() {
                 onMoveInDay={moveInDay}
                 onRemove={removeRoute}
                 onToggleDone={toggleDone}
+                onSetDirection={setDirection}
                 onLockStay={(day, hotelId) => lockStay(day, hotelId)}
                 onAddDay={addDay}
                 onRemoveDay={removeDay}
@@ -776,6 +798,12 @@ export function PlanPage() {
                         </td>
                         <td>
                           <b>{formatKm(r.km)} km</b>
+                        </td>
+                        <td className="td-right">
+                          <DirToggle
+                            value={r.item.direction ?? 'forward'}
+                            onChange={(d) => setDirection(r.route.id, d)}
+                          />
                         </td>
                         <td className="td-right">
                           <button className="btn btn-sm" onClick={() => removeRoute(r.route.id)}>

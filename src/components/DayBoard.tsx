@@ -5,6 +5,7 @@ import { formatKm } from '../lib/geo'
 import {
   estimateHours,
   formatHours,
+  routeEnds,
   unassignedRows,
   type DayPlan,
   type PlanRow,
@@ -60,6 +61,8 @@ export interface DayBoardProps {
   onLockStay: (day: number, hotelId: string | undefined) => void
   onAddDay: () => void
   onRemoveDay: (day: number) => void
+  /** 切换某条路线的行走方向（正穿 / 反穿），默认正穿 */
+  onSetDirection: (routeId: string, direction: 'forward' | 'reverse') => void
   /** 某天的备注（行程单 / Markdown 会带上） */
   noteOfDay: (day: number) => string
   onSetDayNote: (day: number, text: string) => void
@@ -104,6 +107,7 @@ export function DayBoard(props: DayBoardProps) {
     onLockStay,
     onAddDay,
     onRemoveDay,
+    onSetDirection,
     noteOfDay,
     onSetDayNote,
   } = props
@@ -122,25 +126,35 @@ export function DayBoard(props: DayBoardProps) {
    * 每天的全量住宿候选（抽屉用）：不做 8 km 截断，远近都列。
    * 权重与卡片上的候选一致（0.6 × 今晚终点 + 0.4 × 明早起点），所以抽屉开头的
    * 顺序和卡片里露出的那几条是同一套口径，抽屉只是把后面没露出来的补全。
+   * 起终点按当天每条路线的行走方向取（反穿会让「今晚终点」落到官方起点那端）。
    */
   const picksByDay = useMemo(() => {
     const map = new Map<number, StayPickerRow[]>()
     days.forEach((d, i) => {
-      const lastRoute = d.rows[d.rows.length - 1]?.route
+      const lastRow = d.rows[d.rows.length - 1]
+      const lastRoute = lastRow?.route
+      const nextRow = days[i + 1]?.rows[0]
       map.set(
         d.day,
         lastRoute
-          ? rankAllStays(lastRoute, days[i + 1]?.rows[0]?.route, hotels).map(nightRow)
+          ? rankAllStays(
+              lastRoute,
+              nextRow?.route,
+              hotels,
+              lastRow.item.direction,
+              nextRow?.item.direction,
+            ).map(nightRow)
           : [],
       )
     })
     return map
   }, [days, hotels])
 
-  /** 出发前一晚的全量住宿候选：同样不截断，按「离第一天出发点近」排 */
+  /** 出发前一晚的全量住宿候选：同样不截断，按「离第一天出发点近」排（反穿时按反穿后的起点） */
   const prevPicks = useMemo(() => {
-    const firstRoute = firstDay?.rows[0]?.route
-    return firstRoute ? rankAllByStart(firstRoute, hotels).map(prevRow) : []
+    const firstRow = firstDay?.rows[0]
+    const firstRoute = firstRow?.route
+    return firstRoute ? rankAllByStart(firstRoute, hotels, firstRow.item.direction).map(prevRow) : []
   }, [firstDay, hotels])
 
   const handleDrop = (dayKey: string) => {
@@ -196,6 +210,7 @@ export function DayBoard(props: DayBoardProps) {
                 onMoveInDay={onMoveInDay}
                 onRemove={onRemove}
                 onToggleDone={onToggleDone}
+                onSetDirection={onSetDirection}
                 {...dragProps(r.route.id)}
               />
             ))
@@ -213,7 +228,11 @@ export function DayBoard(props: DayBoardProps) {
               {prevLabel && <span className={`${styles['col-date']}`}>{prevLabel}</span>}
             </div>
             <div className={`${styles['col-line']}`}>
-              第一天要从「{firstDay.rows[0].route.startPoint?.name ?? firstDay.rows[0].route.name}」开走
+              {(() => {
+                const fr = firstDay.rows[0]
+                const start = routeEnds(fr.route, undefined, fr.item.direction).start
+                return `第一天要从「${start?.name ?? fr.route.name}」开走`
+              })()}
             </div>
             <PrevStayCard
               prev={prevNight}
@@ -285,6 +304,7 @@ export function DayBoard(props: DayBoardProps) {
                       onMoveInDay={onMoveInDay}
                       onRemove={onRemove}
                       onToggleDone={onToggleDone}
+                      onSetDirection={onSetDirection}
                       {...dragProps(r.route.id)}
                     />
                   ))
@@ -355,13 +375,48 @@ interface CardProps {
   onMoveInDay: (routeId: string, dir: -1 | 1) => void
   onRemove: (routeId: string) => void
   onToggleDone: (routeId: string) => void
+  onSetDirection: (routeId: string, direction: 'forward' | 'reverse') => void
   setDrag: (id: string | null) => void
   clearDrag: () => void
+}
+
+/**
+ * 正穿 / 反穿 切换控件：两个小按钮，选中态高亮。默认正穿（灰色=正，绿色=反）。
+ * 抽成组件是因为行程篮卡片和清单视图两处都要用到，避免各写一遍样式漂移。
+ */
+export function DirToggle({
+  value,
+  onChange,
+}: {
+  value: 'forward' | 'reverse'
+  onChange: (d: 'forward' | 'reverse') => void
+}) {
+  return (
+    <span className={`${styles['dir-toggle']}`} role="group" aria-label="行走方向">
+      <button
+        type="button"
+        className={value === 'forward' ? `${styles['dir-btn']} ${styles['dir-on']}` : styles['dir-btn']}
+        aria-pressed={value === 'forward'}
+        onClick={() => onChange('forward')}
+      >
+        正穿
+      </button>
+      <button
+        type="button"
+        className={value === 'reverse' ? `${styles['dir-btn']} ${styles['dir-on']}` : styles['dir-btn']}
+        aria-pressed={value === 'reverse'}
+        onClick={() => onChange('reverse')}
+      >
+        反穿
+      </button>
+    </span>
+  )
 }
 
 function Card(p: CardProps) {
   const { row, day } = p
   const isIsland = (row.route.tags ?? []).includes('离岛') || (row.route.region ?? '').includes('离岛')
+  const direction = row.item.direction ?? 'forward'
   return (
     <article
       className={`${styles.card}${p.dragging ? ` ${styles['is-dragging']}` : ''}`}
@@ -385,12 +440,13 @@ function Card(p: CardProps) {
       <div className={`${styles['card-meta']}`}>
         <b>{formatKm(row.km)} km</b>
         <span>↑{row.gainM == null ? '—' : Math.round(row.gainM)} m</span>
-        {/* 官方口径优先：录了官方耗时就不再显示公式估算值 */}
+        {/* 官方耗时优先：录了官方耗时就显示官方值（不标「官方」，靠数值本身区分），无官方数据回退估算 */}
         <span>
           {officialDuration(row.route.code)
-            ? `${formatDurationRange(officialDuration(row.route.code)!)}（官方）`
+            ? `${formatDurationRange(officialDuration(row.route.code)!)}`
             : `约 ${formatHours(estimateHours(row.km, row.gainM))}`}
         </span>
+        <DirToggle value={direction} onChange={(d) => p.onSetDirection(row.route.id, d)} />
       </div>
       <div className={`${styles['card-act']}`}>
         <Select

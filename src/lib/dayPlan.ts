@@ -10,7 +10,7 @@
  * - **同一天内的顺序 = items 数组的先后顺序**：没有单独的 order 字段，
  *   避免「按加入顺序」和「第 N 天里的第几条」变成两套互相打架的真相。
  */
-import type { GeoPoint, Plan, PlanItem, Route, RouteMetrics, TrackPoint } from '../types'
+import type { GeoPoint, Plan, PlanItem, Route, RouteDirection, RouteMetrics, TrackPoint } from '../types'
 import { haversineKm } from './geo'
 
 /** 行程篮里一条已解析的路线（找不到对应 Route 的脏 item 会被丢掉） */
@@ -177,13 +177,25 @@ export function dayIslandExtraH(rows: PlanRow[]): number {
   return rows.reduce((s, r) => s + islandExtraH(r.route), 0)
 }
 
-/** 路线的实际起点/终点：权威起终点字段优先，其次结算出来的轨迹端点 */
-export function routeEnds(route: Route, m?: RouteMetrics): { start?: TrackPoint; end?: TrackPoint } {
+/**
+ * 路线的实际起点/终点：权威起终点字段优先，其次结算出来的轨迹端点。
+ *
+ * @param direction 行走方向。`reverse`（反穿）时把首尾端点对调——
+ *   当天「从哪出发 / 到哪结束」随之翻转，接力断口、当晚住宿位置、次日出发点都会跟着变。
+ *   缺省 'forward'（正穿），兼容旧调用与只看官方正穿的场合（路线详情页）。
+ */
+export function routeEnds(
+  route: Route,
+  m?: RouteMetrics,
+  direction: RouteDirection = 'forward',
+): { start?: TrackPoint; end?: TrackPoint } {
   const pts = route.points ?? []
-  return {
+  const fwd = {
     start: route.startPoint ?? m?.startPoint ?? pts[0],
     end: route.endPoint ?? m?.endPoint ?? (pts.length ? pts[pts.length - 1] : undefined),
   }
+  if (direction === 'reverse') return { start: fwd.end, end: fwd.start }
+  return fwd
 }
 
 /** 把 plan.items 解析成带 Route 的行；缺 Route 或值为空的行被丢掉 */
@@ -245,6 +257,8 @@ export function planDays(
   plan: Plan | undefined,
   rows: PlanRow[],
   metrics: Map<string, RouteMetrics>,
+  /** 某天锁定的住宿坐标（day → 坐标）；有则从住宿点算接驳距离，没有才从当天路线终点算 */
+  dayStayGeo?: Map<number, GeoPoint>,
 ): DayPlan[] {
   const nums = planDayNumbers(plan)
   return nums.map((day) => {
@@ -255,14 +269,21 @@ export function planDays(
     const difficultyMax = Math.max(0, ...dayRows.map((r) => r.route.difficulty ?? 0))
     const hasIsland = dayRows.some((r) => isIslandRoute(r.route))
 
-    // 接力断口：前一天的终点 ↔ 当天的起点（前一天不存在就不判断）
+    // 接力断口：前一天「住哪」↔ 当天的起点（前一天不存在就不判断）。
+    // 两端都按各自当天的行走方向取，反穿会让「当天起点」落到官方终点那端。
+    // 前一天若锁定了住宿，从住宿点算接驳距离（人睡在那，不是睡在路线终点）；
+    // 没选住宿才回退到当天路线终点。
     let transferGapKm: number | undefined
+    const prevStay = dayStayGeo?.get(day - 1)
     const prevRows = rows.filter((r) => r.item.day === day - 1)
     if (day > 1 && prevRows.length && dayRows.length) {
-      const prevEnd = routeEnds(prevRows[prevRows.length - 1].route, metrics.get(prevRows[prevRows.length - 1].route.id)).end
-      const curStart = routeEnds(dayRows[0].route, metrics.get(dayRows[0].route.id)).start
-      if (prevEnd && curStart) {
-        const gap = haversineKm(toGeo(prevEnd), toGeo(curStart))
+      const prevLast = prevRows[prevRows.length - 1]
+      const curFirst = dayRows[0]
+      const prevEnd = routeEnds(prevLast.route, metrics.get(prevLast.route.id), prevLast.item.direction).end
+      const curStart = routeEnds(curFirst.route, metrics.get(curFirst.route.id), curFirst.item.direction).start
+      const fromGeo = prevStay ?? (prevEnd ? toGeo(prevEnd) : undefined)
+      if (fromGeo && curStart) {
+        const gap = haversineKm(fromGeo, toGeo(curStart))
         if (gap > TRANSFER_GAP_KM) transferGapKm = gap
       }
     }
@@ -273,7 +294,9 @@ export function planDays(
     if (transferGapKm !== undefined) {
       warnings.push({
         kind: 'gap',
-        text: `与第 ${day - 1} 天有 ${transferGapKm.toFixed(1)} km 断口 —— 昨天终点不是今天起点，需要坐车接驳。`,
+        text: `与第 ${day - 1} 天有 ${transferGapKm.toFixed(1)} km 断口 —— ${
+          prevStay ? '前一天住宿点' : '昨天终点'
+        }不是今天起点，需要坐车接驳。`,
       })
     }
     if (hasIsland) {
@@ -339,6 +362,11 @@ export function assignDayItems(items: PlanItem[], routeId: string, day: number |
     delete next.stayNote
     return next
   })
+}
+
+/** 切换某条路线的行走方向（正穿 / 反穿）；返回新数组，不改动入参 */
+export function setDirectionItems(items: PlanItem[], routeId: string, direction: RouteDirection): PlanItem[] {
+  return items.map((i) => (i.routeId !== routeId ? i : { ...i, direction }))
 }
 
 /**

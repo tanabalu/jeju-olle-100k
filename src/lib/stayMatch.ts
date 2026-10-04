@@ -15,7 +15,7 @@
  * 拿不到的一律返回空/降级，**不编造酒店名**。宁可显示「附近没有已录入的住宿」，
  * 也不能虚构一家看起来合理的民宿 —— 用户会照着找过去。
  */
-import type { Hotel, PlanItem, Route } from '../types'
+import type { Hotel, PlanItem, Route, RouteDirection } from '../types'
 import { TRIP_PLANS, type TripPlan } from './tripPlans'
 import { haversineKm } from './geo'
 import type { DayPlan } from './dayPlan'
@@ -157,8 +157,11 @@ export function suggestStay(
 ): StaySuggestion | null {
   if (!day.rows.length) return null
 
-  const lastRoute = day.rows[day.rows.length - 1].route
+  const lastRow = day.rows[day.rows.length - 1]
+  const lastRoute = lastRow.route
+  const lastDir = lastRow.item.direction
   const nextFirstRoute = nextDay?.rows[0]?.route
+  const nextDir = nextDay?.rows[0]?.item.direction
 
   const lockedId = stayIdOfDay(items, day.day)
   const locked = lockedId ? hotels.find((h) => h.hotel.id === lockedId) : undefined
@@ -173,7 +176,7 @@ export function suggestStay(
     reason: '你锁定了这家 —— 手动选择优先。',
     source: 'locked',
     lockedHotel: locked.hotel,
-    candidates: rankCandidates(lastRoute, nextFirstRoute, hotels),
+    candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, STAY_SEARCH_KM, lastDir, nextDir),
   }
 }
 
@@ -194,6 +197,7 @@ function autoStay(
   const lastRow = rows[rows.length - 1]
   const lastRoute = lastRow.route
   const nextFirstRoute = nextDay?.rows[0]?.route
+  const nextDir = nextDay?.rows[0]?.item.direction
 
   /* ---- 规则 2：离岛 → 提示船班风险，住宿地以官方口径为准 ---- */
   const islandRow = rows.find((r) => isIslandRoute(r.route))
@@ -205,12 +209,13 @@ function autoStay(
       //    只有真的错过末班船才需要在岛上过夜。这里只把风险说清楚，不断言住哪。
       reason: `「${islandRow.route.name}」在离岛，需要坐船进出 —— 首末班船时间务必提前确认，一旦错过当晚只能在岛上过夜。`,
       source: 'island',
-      candidates: rankCandidates(islandRow.route, nextFirstRoute, hotels),
+      candidates: rankCandidates(islandRow.route, nextFirstRoute, hotels, STAY_SEARCH_KM, islandRow.item.direction, nextDir),
     }
   }
 
   /* ---- 规则 3：当天最后一站的官方建议（首选） ---- */
   const primaryArea = nightAreaOf(lastRoute)
+  const lastEndName = routeEnds(lastRoute, undefined, lastRow.item.direction).end?.name ?? lastRoute.name
 
   /* ---- 规则 4：与「明早上哪出发」交叉校验 ---- */
   const nextMorning = nextFirstRoute ? morningAreaOf(nextFirstRoute) : undefined
@@ -219,13 +224,11 @@ function autoStay(
       area: shortArea(primaryArea),
       // 这一支是「今晚的建议」和「明早的建议」不完全对上的情况：
       // 只陈述事实（终点在哪、官方怎么建议），不断言「终点就在推荐区内」。
-      reason: `走完当天官方建议住 ${shortArea(primaryArea)}（今天终点在${
-        lastRoute.endPoint?.name ?? lastRoute.name
-      }）。`,
+      reason: `走完当天官方建议住 ${shortArea(primaryArea)}（今天终点在${lastEndName}）。`,
       altArea: shortArea(nextMorning),
       altReason: `明天第一条「${nextFirstRoute!.name}」官方建议前一晚住 ${shortArea(nextMorning)} —— 离明早出发点近，但离今晚终点远一些。`,
       source: 'lastRoute',
-      candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, ),
+      candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, STAY_SEARCH_KM, lastRow.item.direction, nextDir),
     }
   }
 
@@ -235,9 +238,9 @@ function autoStay(
       area: shortArea(primaryArea),
       reason: compatible
         ? `官方口径一致：走完当天建议住 ${shortArea(primaryArea)}，明天第一条的官方建议前一晚也是这里。`
-        : `走完当天建议住 ${shortArea(primaryArea)}（终点在${lastRoute.endPoint?.name ?? '附近'}）。`,
+        : `走完当天建议住 ${shortArea(primaryArea)}（终点在${lastEndName}）。`,
       source: 'lastRoute',
-      candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, ),
+      candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, STAY_SEARCH_KM, lastRow.item.direction, nextDir),
     }
   }
 
@@ -248,7 +251,7 @@ function autoStay(
       area: shortArea(fallback),
       reason: `这条路线没有官方住宿建议数据，按今天终点所在地推的：住 ${shortArea(fallback)} 就近落脚。`,
       source: 'fallback',
-      candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, ),
+      candidates: rankCandidates(lastRoute, nextFirstRoute, hotels, STAY_SEARCH_KM, lastRow.item.direction, nextDir),
     }
   }
   return null
@@ -272,7 +275,8 @@ export function suggestPrevNight(
 ): PrevStaySuggestion | null {
   if (!firstDay?.rows.length) return null
   const firstRoute = firstDay.rows[0].route
-  const candidates = rankByStart(firstRoute, hotels)
+  const firstDir = firstDay.rows[0].item.direction
+  const candidates = rankByStart(firstRoute, hotels, STAY_SEARCH_KM, firstDir)
 
   const locked = prevStayId ? hotels.find((h) => h.hotel.id === prevStayId) : undefined
   const auto = autoPrevNight(firstDay, hotels)
@@ -301,12 +305,13 @@ function autoPrevNight(
 ): PrevStaySuggestion | null {
   if (!firstDay?.rows.length) return null
   const firstRoute = firstDay.rows[0].route
-  const candidates = rankByStart(firstRoute, hotels)
+  const firstDir = firstDay.rows[0].item.direction
+  const candidates = rankByStart(firstRoute, hotels, STAY_SEARCH_KM, firstDir)
 
   /* 规则 2：官方口径 —— 走这条之前那一晚建议住哪 */
   const area = morningAreaOf(firstRoute)
   if (area) {
-    const startName = firstRoute.startPoint?.name ?? routeEnds(firstRoute).start?.name
+    const startName = firstRoute.startPoint?.name ?? routeEnds(firstRoute, undefined, firstDir).start?.name
     return {
       area: shortArea(area),
       reason: `第一天要从${startName ? ` ${startName} ` : ''}开走 —— 官方建议前一晚住 ${shortArea(
@@ -341,8 +346,9 @@ function rankByStart(
   route: Route,
   hotels: LinkedHotel[],
   maxKm: number = STAY_SEARCH_KM,
+  direction?: RouteDirection,
 ): PrevStayCandidate[] {
-  const start = endpointGeo(route, 'start')
+  const start = endpointGeo(route, 'start', direction)
   if (!start) return []
   const seen = new Set<string>()
   const out: PrevStayCandidate[] = []
@@ -404,9 +410,11 @@ function rankCandidates(
   nextFirstRoute: Route | undefined,
   hotels: LinkedHotel[],
   maxKm: number = STAY_SEARCH_KM,
+  lastDir?: RouteDirection,
+  nextDir?: RouteDirection,
 ): StayCandidate[] {
-  const end = endpointGeo(lastRoute, 'end')
-  const nextStart = nextFirstRoute ? endpointGeo(nextFirstRoute, 'start') : undefined
+  const end = endpointGeo(lastRoute, 'end', lastDir)
+  const nextStart = nextFirstRoute ? endpointGeo(nextFirstRoute, 'start', nextDir) : undefined
   if (!end) return []
   const seen = new Set<string>()
   const out: StayCandidate[] = []
@@ -439,8 +447,8 @@ function priceFloor(hotel: Hotel): number {
   return nums.length ? Math.min(...nums) : Number.POSITIVE_INFINITY
 }
 
-function endpointGeo(route: Route, which: 'start' | 'end'): EndGeo | undefined {
-  const p = which === 'end' ? routeEnds(route).end : routeEnds(route).start
+function endpointGeo(route: Route, which: 'start' | 'end', direction?: RouteDirection): EndGeo | undefined {
+  const p = which === 'end' ? routeEnds(route, undefined, direction).end : routeEnds(route, undefined, direction).start
 const src =
     p ??
     (which === 'end'
@@ -462,8 +470,10 @@ export function rankAllStays(
   lastRoute: Route,
   nextFirstRoute: Route | undefined,
   hotels: LinkedHotel[],
+  lastDir?: RouteDirection,
+  nextDir?: RouteDirection,
 ): StayCandidate[] {
-  return rankCandidates(lastRoute, nextFirstRoute, hotels, Number.POSITIVE_INFINITY)
+  return rankCandidates(lastRoute, nextFirstRoute, hotels, Number.POSITIVE_INFINITY, lastDir, nextDir)
 }
 
 /**
@@ -472,8 +482,12 @@ export function rankAllStays(
  * 排序权重与候选一致（离第一天出发点越近越靠前），所以列表开头的顺序和卡片上
  * 那几条是一致的 —— 抽屉只是把 8 km 以外没露出来的部分补全，方便有车时挑远处的。
  */
-export function rankAllByStart(firstRoute: Route, hotels: LinkedHotel[]): PrevStayCandidate[] {
-  return rankByStart(firstRoute, hotels, Number.POSITIVE_INFINITY)
+export function rankAllByStart(
+  firstRoute: Route,
+  hotels: LinkedHotel[],
+  direction?: RouteDirection,
+): PrevStayCandidate[] {
+  return rankByStart(firstRoute, hotels, Number.POSITIVE_INFINITY, direction)
 }
 
 /** 把全部路线的住宿收集成候选池（去重靠 id 冲突时的先到先得） */

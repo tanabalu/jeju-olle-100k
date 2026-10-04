@@ -173,11 +173,16 @@ export interface Route {
   updatedAt: number
 }
 
+/** 路线在行程里的行走方向：正穿（官方起→终）/ 反穿（终→起） */
+export type RouteDirection = 'forward' | 'reverse'
+
 /** 行程篮里的一条：每条路线只算一次，重复加入不会叠加 */
 export interface PlanItem {
   routeId: string
   /** 是否已走完（用户手动勾选），用于查看完成进度 */
   done?: boolean
+  /** 行走方向：正穿（默认）/ 反穿。缺省视为正穿，兼容旧行程篮数据 */
+  direction?: RouteDirection
   /**
    * 第几天走（1-based）。undefined = 还没分天，落在「待安排」。
    *

@@ -491,3 +491,30 @@
     flex: 1 1 160px;
   }
 }
+
+/* 正穿 / 反穿 切换控件：两个小按钮，选中态绿色高亮 */
+.dir-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid #cdd5df;
+  border-radius: 6px;
+  overflow: hidden;
+  align-self: center;
+}
+.dir-btn {
+  border: 0;
+  background: #fff;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  cursor: pointer;
+  color: #64748b;
+}
+.dir-btn + .dir-btn {
+  border-left: 1px solid #cdd5df;
+}
+.dir-on {
+  background: #2f7d4f;
+  color: #fff;
+}
+

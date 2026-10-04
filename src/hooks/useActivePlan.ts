@@ -7,8 +7,10 @@ import {
   moveInDayItems,
   planDayNumbers,
   removeDayItems,
+  setDirectionItems,
   setStayItems,
 } from '../lib/dayPlan'
+import type { RouteDirection } from '../types'
 
 /** 允许「删除」的字段 —— 只有可选字段能被 delete，TS 也是这么要求的 */
 type PlanOptionalKey = 'startDate' | 'dayNotes' | 'dayCount' | 'prevStayId' | 'prevStayNote'
@@ -193,6 +195,15 @@ export function useActivePlan() {
     upsertPlan({ ...plan, dayCount: (nums.length ? nums[nums.length - 1] : 0) + 1 })
   }, [plan, upsertPlan])
 
+  /** 切换某条路线在行程里的行走方向（正穿 / 反穿），默认正穿 */
+  const setDirection = useCallback(
+    (routeId: string, direction: RouteDirection) => {
+      if (!plan) return
+      upsertPlan({ ...plan, items: setDirectionItems(plan.items, routeId, direction) })
+    },
+    [plan, upsertPlan],
+  )
+
   /** 删除第 day 天：该天路线退回待安排，后面的天整体前移 */
   const removeDay = useCallback(
     (day: number) => {
@@ -226,6 +237,7 @@ export function useActivePlan() {
     lockStay,
     addDay,
     removeDay,
+    setDirection,
     /** 对外暴露的建篮入口：签名与 DataContext.createPlan 保持一致（可带初始 items） */
     createPlan: (name?: string, targetKm?: number, items?: import('../types').PlanItem[]) => {
       const p = createPlan(name, targetKm, items)

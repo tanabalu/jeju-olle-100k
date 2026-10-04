@@ -126,7 +126,11 @@ export function PlanPrintSheet({
             {prevLabel && <span className={`${styles['day-ends']}`}>· {prevLabel}</span>}
           </div>
           <div className={`${styles['day-ends']}`}>
-            次日从「{firstRouteDay.rows[0].route.startPoint?.name ?? firstRouteDay.rows[0].route.name}」开走
+            {(() => {
+              const fr = firstRouteDay.rows[0]
+              const name = routeEnds(fr.route, metrics.get(fr.route.id), fr.item.direction).start?.name ?? fr.route.name
+              return `次日从「${name}」开走`
+            })()}
           </div>
           {prevNight ? (
             <>
@@ -180,8 +184,8 @@ export function PlanPrintSheet({
         const stay = stays.get(d.day) ?? null
         const firstRow = d.rows[0]
         const lastRow = d.rows[d.rows.length - 1]
-        const dayStart = routeEnds(firstRow.route, metrics.get(firstRow.route.id)).start
-        const dayEnd = routeEnds(lastRow.route, metrics.get(lastRow.route.id)).end
+        const dayStart = routeEnds(firstRow.route, metrics.get(firstRow.route.id), firstRow.item.direction).start
+        const dayEnd = routeEnds(lastRow.route, metrics.get(lastRow.route.id), lastRow.item.direction).end
         const labels = d.rows.map((r) => routeLabel(r.route)).join(' + ')
         const regions = [...new Set(d.rows.map((r) => r.route.region).filter(Boolean))]
         /* 官方耗时优先：当天每条都有官方区间就相加成「官方 X~Yh」，否则退回估算值 */
