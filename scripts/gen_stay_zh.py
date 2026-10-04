@@ -249,15 +249,17 @@ def main():
             total += 1
             zh, cat, rom, place_only = make(h)
             h['nameRomaja'] = rom
-            if cat:
-                h['note'] = cat
             # 官方中文名（nameZhOfficial，不限来源：TourAPI / 人工核对都打这个标记）才保护，
             # 其余条目走同一口径（剥离业态词 + 地名意译 + 纯中文判定）。
+            # 保护规则：用户/官方明确给的中文名与 note 原样保留，不走重算口径——
+            # nameZh 含拉丁品牌字（如「西归浦KAL酒店」的 KAL）也保留，note 里的星级也保留。
             if h.get('nameZhOfficial'):
-                h['nameZh'] = pure_zh(h.get('nameZh'))
+                h['nameZh'] = h.get('nameZh') or None
                 if h['nameZh']:
                     skipped += 1
                 continue
+            if cat:
+                h['note'] = cat
             # 普通条目：品牌整个只是地名（济州 / 汉拿山…）不是可用店名，留空；
             # 其余只保留纯中文，半中半韩一律置空。界面回退优先级：中文>英文>韩文。
             if place_only:
