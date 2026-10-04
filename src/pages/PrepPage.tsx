@@ -302,6 +302,20 @@ export function PrepPage() {
           </label>
           {skippedCount > 0 && <span className="muted">已放弃 {skippedCount} 项</span>}
           <button
+            className="btn btn-sm"
+            disabled={collapsedGroups.length === 0}
+            onClick={() => updateUi({ prepGroupsCollapsed: [] })}
+          >
+            全部展开
+          </button>
+          <button
+            className="btn btn-sm"
+            disabled={groups.length === 0 || collapsedGroups.length >= groups.length}
+            onClick={() => updateUi({ prepGroupsCollapsed: groups.map((g) => g.id) })}
+          >
+            全部折叠
+          </button>
+          <button
             className="btn btn-sm btn-danger"
             disabled={done === 0 && checklist.custom.length === 0 && checklist.extras.length === 0}
             onClick={async () => {
@@ -319,22 +333,6 @@ export function PrepPage() {
             }}
           >
             重置清单
-          </button>
-        </div>
-        <div className="btn-row">
-          <button
-            className="btn btn-sm"
-            disabled={collapsedGroups.length === 0}
-            onClick={() => updateUi({ prepGroupsCollapsed: [] })}
-          >
-            全部展开
-          </button>
-          <button
-            className="btn btn-sm"
-            disabled={groups.length === 0 || collapsedGroups.length >= groups.length}
-            onClick={() => updateUi({ prepGroupsCollapsed: groups.map((g) => g.id) })}
-          >
-            全部折叠
           </button>
         </div>
       </section>

@@ -142,6 +142,38 @@
 .spacer {
   flex: 1;
 }
+/* 清单视图工具条：左侧「只看未完成」是筛选开关（复选框），右侧才是排序按钮组。
+   两者语义不同，用 spacer 拉开、各成一组，避免「只看未完成」长得像排序按钮 */
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+/* 与 PrepPage 的 .switch 保持一致：复选框 + 文字，明显区别于按钮形态 */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.switch input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+/* 排序按钮组：加一个小标签，跟左侧筛选开关在视觉上彻底分开 */
+.sort-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .day-summary {
   display: flex;
   gap: 14px;

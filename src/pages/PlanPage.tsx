@@ -688,25 +688,32 @@ export function PlanPage() {
                   已加入 <span className="count">{rows.length}</span>
                 </h2>
                 {rows.length > 0 && (
-                  <div className="btn-row">
-                    <button
-                      className={`btn btn-sm${hideDone ? ' is-active' : ''}`}
-                      onClick={() => setHideDone(!hideDone)}
-                    >
-                      只看未完成
-                    </button>
-                    <button
-                      className={`btn btn-sm${sort === 'added' ? ' is-active' : ''}`}
-                      onClick={() => setSort('added')}
-                    >
-                      按加入顺序
-                    </button>
-                    <button
-                      className={`btn btn-sm${sort === 'km' ? ' is-active' : ''}`}
-                      onClick={() => setSort('km')}
-                    >
-                      按里程
-                    </button>
+                  <div className={`${styles['list-toolbar']}`}>
+                    {/* 「只看未完成」是筛选开关（复选框），不是排序选项，单独放左侧 */}
+                    <label className={`${styles['switch']}`}>
+                      <input
+                        type="checkbox"
+                        checked={hideDone}
+                        onChange={(e) => setHideDone(e.target.checked)}
+                      />
+                      <span>只看未完成</span>
+                    </label>
+                    <span className={`${styles.spacer}`} />
+                    {/* 排序选项自成一组，与左侧筛选开关区分清楚 */}
+                    <div className={`${styles['sort-group']}`}>
+                      <button
+                        className={`btn btn-sm${sort === 'added' ? ' is-active' : ''}`}
+                        onClick={() => setSort('added')}
+                      >
+                        按加入顺序
+                      </button>
+                      <button
+                        className={`btn btn-sm${sort === 'km' ? ' is-active' : ''}`}
+                        onClick={() => setSort('km')}
+                      >
+                        按里程
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
