@@ -16,8 +16,9 @@ scripts/.cache/
 # 脚本按 cwd 解析路径时会在仓库根留下的缓存（fetch_olle_osm.py 的 OSM 原始数据）
 .cache/
 
-# vite 构建时生成的临时配置（异常退出会残留）
+# vite / vitest 构建时生成的临时配置（异常退出会残留）
 vite.config.ts.timestamp-*
+vitest.config.ts.timestamp-*
 
 # 本地助手工作区（记忆 / 技能），不随仓库分发
 .workbuddy/

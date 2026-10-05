@@ -209,6 +209,48 @@ App 端过不了就落地买实体卡兜底。速查卡片「T-money：办卡与
 **已知取舍**：改结构会丢掉本地已有行程篮里锁过的住宿（`PlanItem.stayId` 字段没了）。按本项目
 「不做 localStorage 历史数据兼容 / 迁移」的约定处理，用户在页面上重新点一次即可。
 
+### 新建 `test/` —— 纯逻辑单测（Vitest）
+
+**动机**（用户原话）：「以后改代码的时候，不要把现在已有的功能给改错了、改乱了、或改漏了」。
+
+**为什么只做逻辑层、不做 UI 单测**：项目里真正容易改崩的是 `src/lib` 的纯函数 ——
+页面上的「第几天走哪条」「这天会不会太重」「今晚住哪」「爬升多少」全由它们算出来，
+而这一层的错误不会报红，只是安静地显示错的东西（那天住宿「点了没反应」的 bug 根因就在
+`dayPlan.ts` 的读写错位）。组件层重度依赖 Leaflet / CSS Modules / localStorage，
+上 `@testing-library` 要造一堆 mock，收益不抵维护成本；真需要时把 `vitest.config.ts`
+的 `environment` 改成 `jsdom` 即可，不用动别的东西。
+
+**落地**：
+
+- `vitest.config.ts`（新建）：只收 `test/**/*.test.ts`，`environment: 'node'`；
+- `package.json`：`npm test`（单次跑）/ `npm run test:watch`（监听）；
+- `tsconfig.json`：`include` 加 `test` —— 测试代码同样过 `tsc --noEmit`，
+  `npm run build` 会因为测试里的类型问题一起失败，避免「测试本身已经写错了却还在跑」；
+- `test/fixtures.ts`：造 `Route` / `Plan` / `Hotel` 的工厂。两个纪律写进文件头 ——
+  ① id 必须写死（随机 id 会让去重类用例失去意义）；② 坐标用真实量级的济州岛经纬度
+  （0/0 会让 8km 候选半径、1km 接驳断口这类断言失效）。
+
+**六个测试文件，147 条**：
+
+| 文件 | 覆盖 |
+|---|---|
+| `dayPlan.test.ts` | 分天与时辰、离岛、反穿取端点、items 增删移、住宿按天锁定、按天告警 |
+| `geo.test.ts` | 距离、爬升（3m 噪声阈值）、断口分段、画线几何、徽标落点 |
+| `stayMatch.test.ts` | 每晚 / 前夜建议的构成、锁定不改写区域建议、候选去重与全量兜底 |
+| `staySearch.test.ts` | 大小写不敏感、分隔符、多词且关系、罗马音 ↔ 英文惯用拼写 |
+| `storage.test.ts` | 归一化、备份导入导出（replace / merge）、脏 JSON、设置白名单 |
+| `display.test.ts` | 三语名称回退、官方耗时/路面/路线类型、清单 id 唯一等数据不变量 |
+
+**写断言的口径**：给**现象级的期望**（起床时刻应该是几点、删第 1 天后第 3 天那晚的住宿
+落到第几天），不照着实现抄公式 —— 后者只防得住重构，防不住算错。
+
+**测试顺带抓出的真实 bug（已修）**：`src/lib/storage.ts` 的 `normalizeRoute` 里
+`elevationSegments` 的注释写着「脏段直接丢」，实现却是 `...(segs.length ? { 字段 } : {})` ——
+而该对象是从 `...route` 展开来的，没有合法分段时展开空对象等于什么都不做，
+那段单点 segment 原样留在了「已经归一化过」的路线对象上。改成命中 `Array.isArray`
+时显式赋值 / `delete`。影响面已核过：唯一消费方 `geo.trackSegs` 本来就过滤 `length >= 2`，
+所以是「文档与实现不一致」，不是用户可见问题。
+
 ## 2026-10-03（续·9）
 
 ### 删掉「近似剖面」：`olleeElevation.ts` 改为由真实轨迹派生

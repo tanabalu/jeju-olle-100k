@@ -137,7 +137,7 @@ function arr<T>(v: unknown): T[] {
  * `album` 里任意一个缺失，页面就会在 `.length` / `.map` 上直接白屏。所以在读取边界一次性补齐。
  */
 export function normalizeRoute(route: Route): Route {
-  return {
+  const out: Route = {
     ...route,
     tags: arr<string>(route.tags),
     points: arr<TrackPoint>(route.points),
@@ -148,14 +148,19 @@ export function normalizeRoute(route: Route): Route {
     })),
     album: arr<AlbumItem>(route.album),
     elevationProfile: arr<ElevSample>(route.elevationProfile),
-    // 有断口的轨迹：分段几何。每段至少 2 个点，脏段直接丢
-    ...(() => {
-      const segs = (Array.isArray(route.elevationSegments) ? route.elevationSegments : [])
-        .map((s) => arr<ElevSample>(s))
-        .filter((s) => s.length >= 2)
-      return segs.length ? { elevationSegments: segs } : {}
-    })(),
   }
+
+  // 有断口的轨迹：分段几何。每段至少 2 个点，脏段直接丢。
+  //
+  // ⚠️ 必须显式删：上面是 `...route` 展开进来的，写成 `...(有值 ? { 字段 } : {})` 的话，
+  //    「没有合法分段」时展开的是空对象，脏数据会原样留在继承来的字段上 ——
+  //    看上去已经归一化过，实际那段单点 segment 还躺在那里。
+  if (Array.isArray(route.elevationSegments)) {
+    const segs = route.elevationSegments.map((s) => arr<ElevSample>(s)).filter((s) => s.length >= 2)
+    if (segs.length) out.elevationSegments = segs
+    else delete out.elevationSegments
+  }
+  return out
 }
 
 /**
