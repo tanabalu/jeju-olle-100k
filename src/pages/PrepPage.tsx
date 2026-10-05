@@ -101,11 +101,11 @@ export function PrepPage() {
     // 自己补充的条目、从「女士/男士常用清单」加进来的条目，各成一组接在官方分组后面。
     // 备选那组会在条目标题后带来源标签（女士/男士），一眼认得出是挑进来的。
     const mine: PrepGroup[] = [
-      { id: 'custom', title: '我自己加的', desc: '官方清单没覆盖到的，自己补。', items: checklist.custom },
+      { id: 'custom', title: '我自己加的', desc: '想加什么就加什么，随时能删。', items: checklist.custom },
       {
         id: 'extras',
         title: '备选清单已加入',
-        desc: '从「徒步装备 / 女士常用 / 男士常用 / 大疆 / 相机 / 无人机」几份备选清单里挑进来的，不想要的那一条直接移除即可。',
+        desc: '从备选清单挑进来、并进总清单一块算进度的条目；不想要的那一条直接移除即可。',
         items: checklist.extras,
       },
     ].filter((g) => g.items.length > 0)
@@ -241,7 +241,7 @@ export function PrepPage() {
         <h1 className="detail-title">行前准备 · 济州岛</h1>
         <p className="muted">
           逐项打勾，进度存在本机浏览器。标「<span className={`${styles['verify-tag']}`}>临行复核</span>」
-          的请出发前再确认一遍；不会动手的条目点右侧「<b>图文教程</b>」看分步骤图解。因人而异的装备 / 拍摄器材，到下方备选清单挑着加入。
+          的请出发前再确认一遍；不会动手的条目点右侧「<b>图文教程</b>」看分步骤图解。安全补给 / 装备 / 拍摄器材因人而异，到下方备选清单挑着加入。
         </p>
       </div>
 
@@ -506,7 +506,7 @@ export function PrepPage() {
       <section id="prep-presets" className="section">
         <h2>按需加入备选清单</h2>
         <p className="muted">
-          下面是分装备 / 性别 / 拍摄设备的补充项，<b>不要求全加</b>；点「加入」并进总清单一起算进度，加错随时移除，重复项会标「已在清单」。
+          下面是分安全 / 装备 / 性别 / 拍摄设备的补充项，<b>不要求全加</b>；点「加入」并进总清单一起算进度，加错随时移除，重复项会标「已在清单」。
         </p>
         <div className={`${styles['grid-preset']}`}>
           {PREP_PRESETS.map((p) => {
@@ -670,7 +670,7 @@ export function PrepPage() {
       )}
 
       {/* ---------- 吃喝住行 ---------- */}
-      <h2 className={`${styles['prep-h2']}`}>吃喝住行速查</h2>
+      <h2 className={`${styles['prep-h2']}`}>吃喝住行与支付速查</h2>
       <p className="muted">按品类给方向，不推荐具体店名；价格仅作预算参考。</p>
       {GUIDE_SECTIONS.map((s) => (
         <section id={`prep-s-${s.id}`} className="section" key={s.id}>
@@ -696,6 +696,47 @@ export function PrepPage() {
                         {s.label}
                       </a>
                     ))}
+                  </div>
+                )}
+                {/* 落地后才用得上的操作教程挂在卡片上：清单里不占条目，需要时展开 */}
+                {c.tutorials && c.tutorials.length > 0 && (
+                  <div className={`${styles['guide-tutorials']}`}>
+                    {c.tutorials.map((tid) => {
+                      const tut = tutorialOf(tid)
+                      if (!tut) return null
+                      const open = openTutorialSet.has(tid)
+                      return (
+                        <div key={tid}>
+                          <button
+                            className={`btn-link ${styles['tut-btn']}`}
+                            aria-expanded={open}
+                            onClick={() => setTutorialOpen(tid, !open)}
+                          >
+                            <span
+                              className={`${styles['tut-chev']}${open ? ` ${styles['is-open']}` : ''}`}
+                              aria-hidden="true"
+                            >
+                              ▸
+                            </span>
+                            图文教程：{tut.title}
+                          </button>
+                          {open && (
+                            <div className={`${styles['tut-inline']}`}>
+                              <div className={`${styles['tut-inline-head']}`}>
+                                <b>{tut.title}</b>
+                                <button
+                                  className="btn-link"
+                                  onClick={() => setTutorialOpen(tid, false)}
+                                >
+                                  收起
+                                </button>
+                              </div>
+                              <TutorialBody tutorial={tut} />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

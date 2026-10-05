@@ -241,6 +241,22 @@
 .guide-card li + li {
   margin-top: 3px;
 }
+/* 速查卡片挂的图文教程入口：从待办清单下沉过来的落地操作（充值 / 查余额 / 上下车刷卡） */
+.guide-tutorials {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.guide-tutorials .tut-btn {
+  font-size: 12px;
+}
+/* 卡片里没有清单的缩进层级，教程面板贴左对齐 */
+.guide-tutorials .tut-inline {
+  margin-left: 0;
+}
 .guide-warn {
   margin: 8px 0 0;
   padding: 8px 10px;
