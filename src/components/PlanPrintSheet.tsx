@@ -14,6 +14,7 @@ import {
   islandZh,
   isIslandRoute,
   routeEnds,
+  stayNights,
   type DayPlan,
   type PlanRow,
 } from '../lib/dayPlan'
@@ -101,8 +102,12 @@ export function PlanPrintSheet({
   const firstRouteDay = routeDays[0]
   const firstPrintDay = printDays[0]
   const lastFn = [...printDays].reverse()[0]
-  // 住几晚：出发前一晚 + 印进行程单的每一天当晚（最后一天也算 —— 那晚也要落脚）
-  const nights = dayCount > 0 ? dayCount + 1 : 0
+  /**
+   * 住几晚：出发前一晚 + 每个有路线的天当晚（最后一天也算 —— 那晚也要落脚）。
+   * ⚠️ 按「有路线」算、不按「印出来的天数」算：空天那节只印备注、没有住宿行，
+   * 按天数算会凭空多出一晚，和按天视图的「需住宿 N 晚」对不上。
+   */
+  const nights = stayNights(days)
 
   return (
     <div className={`${styles.sheet}`}>
@@ -113,7 +118,8 @@ export function PlanPrintSheet({
           <span>共 {dayCount} 天</span>
           <span><b>{formatKm(totalKm)}</b> km</span>
           {totalGain !== null && <span>累计爬升 {Math.round(totalGain)} m</span>}
-          <span>{nights} 晚住宿</span>
+          {/* 一趟徒步都没排就没有住宿建议，这一项不出现（写「0 晚住宿」是误导） */}
+          {nights > 0 && <span>{nights} 晚住宿</span>}
           {lastFn?.dateISO && lastFn.dateISO !== firstPrintDay?.dateISO && <span>至 {lastFn.dateISO}</span>}
         </div>
       </div>

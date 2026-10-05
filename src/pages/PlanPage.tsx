@@ -25,6 +25,7 @@ import {
   planRows,
   routeEnds,
   stayIdOfDay,
+  stayNights,
   unassignedRows,
 } from '../lib/dayPlan'
 import { OLLE_TOTAL_KM } from '../lib/seed'
@@ -297,8 +298,8 @@ export function PlanPage() {
 
   /** 按天视图的汇总 */
   const usedDays = useMemo(() => days.filter((d) => d.rows.length > 0), [days])
-  /** 住几晚 = 出发前一晚 + 已排每一天当晚（最后一天同样算一晚 —— 那晚也要落脚） */
-  const nights = usedDays.length > 0 ? usedDays.length + 1 : 0
+  /** 住几晚：与行程单头部、Markdown 行程单共用 `stayNights`，避免三处口径漂移 */
+  const nights = stayNights(days)
   const overloaded = useMemo(
     () =>
       days
@@ -329,7 +330,8 @@ export function PlanPage() {
     const hasDayNote = (d: { day: number }) => (plan.dayNotes?.[d.day] ?? '').trim().length > 0
     const printedDays = days.filter((d) => d.rows.length > 0 || hasDayNote(d))
     const freeWithNote = printedDays.filter((d) => d.rows.length === 0)
-    const printedNights = printedDays.length > 0 ? printedDays.length + 1 : 0
+    // 与「需住宿 N 晚」、行程单头部同一口径：空天只带备注、没有住宿建议，不算一晚
+    const printedNights = stayNights(printedDays)
     const lines = [
       `# ${plan.name}`,
       '',
@@ -339,11 +341,10 @@ export function PlanPage() {
     if (plan.startDate && printedDays.length) lines.push(`- 出发日：${plan.startDate}`)
     if (printedDays.length) {
       lines.push(`- 天数：${printedDays.length} 天`)
-      lines.push(
-        `- 住宿：${printedNights} 晚（出发前一晚 + 每一天当晚${
-          printedDays.length > 1 ? '，含最后一天' : ''
-        }）`,
-      )
+      // 一趟徒步都没排时压根没有住宿建议，这行就不印（印「0 晚」是误导）
+      if (printedNights > 0) {
+        lines.push(`- 住宿：${printedNights} 晚（含出发前一晚与最后一天当晚）`)
+      }
     } else {
       lines.push(`- 排序：${sort === 'added' ? '按加入顺序' : '按里程排序'}`)
     }
@@ -662,7 +663,7 @@ export function PlanPage() {
                   <span className="muted">待安排</span>
                   <b>{backlog.length} 条</b>
                 </div>
-                <div title="出发前一晚 + 每一天当晚（含最后一天）">
+                <div title="出发前一晚 + 每个有徒步的那天当晚（含最后一天），与行程单上的住宿条数一致">
                   <span className="muted">需住宿</span>
                   <b>{nights} 晚</b>
                 </div>

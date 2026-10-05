@@ -34,6 +34,7 @@ import {
   setDirectionItems,
   setPlanStay,
   stayIdOfDay,
+  stayNights,
   unassignedRows,
 } from '../src/lib/dayPlan'
 import type { PlanRow } from '../src/lib/dayPlan'
@@ -388,6 +389,46 @@ describe('planDays（按天聚合与告警）', () => {
   it('填了出发日才有日期标签', () => {
     const p = plan({ id: 'p', items: [item('A', 1)], startDate: '2026-10-05' })
     expect(planDays(p, [row(A, 1, 10)], NO_METRICS)[0].dateISO).toBe('2026-10-05')
+  })
+})
+
+describe('stayNights（住几晚）', () => {
+  const daysOf = (items: { id: string; day?: number }[], noteDays: number[] = []) => {
+    const p = plan({
+      id: 'p',
+      items: items.map((i) => item(i.id, i.day)),
+      // 空天靠 dayCount 撑出来（同「+ 加一天」），noteDays 也要算进去
+      dayCount: Math.max(1, ...items.map((i) => i.day ?? 1), ...noteDays),
+      ...(noteDays.length ? { dayNotes: Object.fromEntries(noteDays.map((d) => [d, '休整'])) } : {}),
+    })
+    const rows = items.filter((i) => i.day).map((i) => row(route({ id: i.id }), i.day, 10))
+    return planDays(p, rows, NO_METRICS)
+  }
+
+  it('3 天徒步 = 前夜 + 3 晚（最后一天当晚也算）', () => {
+    expect(stayNights(daysOf([{ id: 'A', day: 1 }, { id: 'B', day: 2 }, { id: 'C', day: 3 }]))).toBe(4)
+  })
+
+  /**
+   * 这一条就是「按天 tab 写 N、打印单写 N+1」的复现：
+   * 空天（只写了备注、没排路线）会印进行程单，但那一节没有住宿建议 ——
+   * 按「印出来的天数」算就会凭空多一晚。
+   */
+  it('写了备注的空天不算一晚 —— 行程单上那一节没有住宿', () => {
+    const withNote = daysOf([{ id: 'A', day: 1 }, { id: 'B', day: 2 }], [3])
+    expect(withNote).toHaveLength(3)
+    expect(stayNights(withNote)).toBe(3)
+    // 空天没写备注 → 不印、也不算
+    expect(stayNights(daysOf([{ id: 'A', day: 1 }, { id: 'B', day: 2 }]))).toBe(3)
+  })
+
+  it('一趟徒步都没排 → 0 晚（前夜也不成立，没有「次日从哪开走」）', () => {
+    expect(stayNights([])).toBe(0)
+    expect(stayNights(daysOf([{ id: 'A' }], [1]))).toBe(0)
+  })
+
+  it('只排一天：前夜 + 那一晚', () => {
+    expect(stayNights(daysOf([{ id: 'A', day: 1 }]))).toBe(2)
   })
 })
 

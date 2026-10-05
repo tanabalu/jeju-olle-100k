@@ -337,6 +337,22 @@ export function planDays(
   })
 }
 
+/**
+ * 这一趟要住几晚 = **出发前一晚 + 每个「有徒步路线的天」当晚**（最后一天那晚也照样算）。
+ *
+ * ⚠️ 只有排了路线的天才算一晚：空天（只写备注的自由活动 / 交通 / 休整日）推不出落脚点，
+ * 住宿卡和行程单上都不给建议 —— 算进去就成了「说要住 N 晚、单子上只印得出 N−1 晚住宿」。
+ *
+ * ⚠️ 按天视图的「需住宿 N 晚」、行程单头部、Markdown 行程单三处必须都走这个函数：
+ * 各写一遍公式迟早会漂（历史上一处按「有路线的天」算、一处按「要印出来的天」算，
+ * 于是写了个备注的空天就会让行程单比按天视图多一晚）。
+ */
+export function stayNights(days: DayPlan[]): number {
+  const routeDays = days.filter((d) => d.rows.length > 0).length
+  // 一趟徒步都没排 → 前夜也不成立（没有「次日从哪开走」），直接 0
+  return routeDays > 0 ? routeDays + 1 : 0
+}
+
 function toGeo(p: TrackPoint | GeoPoint): GeoPoint {
   return { lng: p.lng, lat: p.lat }
 }
