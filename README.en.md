@@ -38,7 +38,7 @@ On first open, the **official 29 Olle trails** (source: jejuolle.org + the offic
 | Route numbers, start/end names, official distance, official difficulty | Official website (jejuolle.org), directly usable |
 | Route geometry (shape, start/end coordinates) | **Tracks for all 29 routes** (28 measured + `15-B` inferred from the OSM network) — see below |
 | Elevation & cumulative climb | Calculated from tracks or sampled along them — see below; **all 29 routes have elevation** |
-| Lodging | Preloaded with 239 places from OSM (matched to 12 routes), editable in `/admin` |
+| Lodging | 782 places preloaded (OSM + TourAPI + manually verified, matched to all 29 routes), editable in `/admin` |
 | Card cover | Scenic photo of the route area (Wikimedia Commons free license — run `scripts/fetch_photos.py` first); falls back to the official Route Map if you haven't |
 | Sights, album | Preloaded empty, enter in `/admin` |
 

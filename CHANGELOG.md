@@ -251,6 +251,30 @@ App 端过不了就落地买实体卡兜底。速查卡片「T-money：办卡与
 时显式赋值 / `delete`。影响面已核过：唯一消费方 `geo.trackSegs` 本来就过滤 `length >= 2`，
 所以是「文档与实现不一致」，不是用户可见问题。
 
+### 人工补录住宿：城山「胡安酒店」Hu An Stay Hotel（휴안스테이 호텔）
+
+**背景**：用户给了东线城山一家经济舒适型酒店的完整档案（位置、规模、评分、设施、周边距离、优缺点），录入口径同上一家 Playce Camp。
+
+**落地**：`scripts/data/curated_stays.json` 新增 `manual_hu-an-stay-hotel`（排在 `manual_playce-camp-jeju` 之后），
+`matchKeys` 覆盖韩文（휴안스테이 / 휴안스테이 호텔 / 휴안스테이호텔）、英文（Hu An Stay / Hu An Stay Hotel）、
+中文（胡安酒店 / 济州胡安酒店 / 城山胡安酒店）三种写法；`nameZh`/`nameEn` 带 `nameZhOfficial`/`nameEnOfficial` 保护，
+`gen_stay_zh.py` 不会把用户给的中文名清空。跑完 `fetch_stays_manual.py → gen_stay_zh.py → gen_stay_en.py`，
+城山镇 54 → 55 家，全库 970 条（去重 782）。
+
+**坐标来源要记一笔**：本次 Nominatim 两次空返回、Overpass（`overpass-api.de` 返 HTML 错误页、`overpass.kumi.systems` 空返回）都没拿到这家酒店的 OSM 节点，
+坐标 `126.9332 / 33.4586` 是**按地址 성산중앙로 37번길 9 落在城山里村核心区推算**的：到官方航点「Seongsan Ilchul-bong(peak)」
+（`126.935676 / 33.462152`，见 `src/lib/waypointsData.ts`）直线约 420m、到广崎其海滩约 600m，与平台给的「日出峰 610m / 广崎其 1.1km 步行」比例吻合。
+**待核验**：下次 Overpass 通了按 `name~휴안` 复核一次，误差应在 100–200m 内，不影响 8km 候选半径与「离路线 N km」的判定。
+
+**对客文案**：intro 按 Playce Camp 的同构格式写（基础信息 / 入住政策 / 设施 / 位置与周边 / 优缺点 / 适合谁 / 订房建议）。
+用户档案里「设施按经济型期待」「不要默认含早」这类判断都写进去了；**没写**任何「本条由 XX 整理 / 补录于」之类的编辑动作词。
+
+### 顺带：README 住宿数字对齐实测
+
+四语种 README 的「沿途住宿」一行还写着「OSM 抓来的 239 家（12 条线命中）」，是合并 TourAPI 与人工核对源之前的旧值。
+实测：全库 970 条、按 id 去重 782 家、`routeTowns` 映射下来 **29 条线全部有住宿镇**。
+已把四份 README 统一改成「782 家（OSM / TourAPI / 人工核对合并，29 条线全部命中）」。
+
 ## 2026-10-03（续·9）
 
 ### 删掉「近似剖面」：`olleeElevation.ts` 改为由真实轨迹派生
