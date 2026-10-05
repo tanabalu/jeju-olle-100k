@@ -534,6 +534,16 @@ function StayCard({ day, stay, picks, onLockStay, onOpenPicker }: StayCardProps)
           这条路线没有任何住宿数据可推：既没有官方的住宿建议口径，也没录入过附近的住宿。
           去<Link to="/admin">素材管理</Link>给路线补录住宿后，这里会自动出候选清单。
         </div>
+        {/* 推不出区域不代表没得住：这一天落脚点附近录过住宿的话，仍然可以从抽屉里挑一家 ——
+            与前夜卡同一口径（早期只有前夜卡给了这个入口，每晚这边漏了，等于彻底选不了） */}
+        {picks.length > 0 && (
+          <button className={`${styles['stay-more']}`} onClick={() => onOpenPicker(day.day)}>
+            查看全部住宿（{picks.length} 家）
+            <span className={`${styles['stay-more-arrow']}`} aria-hidden>
+              ›
+            </span>
+          </button>
+        )}
       </div>
     )
   }
@@ -763,12 +773,12 @@ function StayOption({
 /** 导出给 PlanPage 用的辅助：算出所有天的住宿建议 */
 export function buildStays(
   days: DayPlan[],
-  items: import('../types').PlanItem[],
+  plan: import('../types').Plan | undefined,
   hotels: import('../lib/stayMatch').LinkedHotel[],
 ): Map<number, StaySuggestion | null> {
   const map = new Map<number, StaySuggestion | null>()
   days.forEach((d, i) => {
-    map.set(d.day, suggestStay(d, days[i + 1], hotels, items))
+    map.set(d.day, suggestStay(d, days[i + 1], hotels, plan))
   })
   return map
 }

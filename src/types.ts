@@ -192,10 +192,6 @@ export interface PlanItem {
    * 否则「按加入顺序」和「第 N 天里的第几条」会变成两套互相打架的真相）。
    */
   day?: number
-  /** 用户锁定的住宿 id（来自某条 Route.hotels）；锁定后推荐结果不再覆盖 */
-  stayId?: string
-  /** 这晚住宿的备注（"订了海景房，取消需提前 3 天"） */
-  stayNote?: string
 }
 
 /** 行程篮：把若干路线加进来，自动算有没有百公里 */
@@ -212,6 +208,16 @@ export interface Plan {
   startDate?: string
   /** 每天的用户备注，key 为 day（1-based） */
   dayNotes?: Record<number, string>
+  /**
+   * 每天锁定的住宿 id（来自某条 Route.hotels），key 为 day（1-based）。
+   *
+   * 住宿属于「这一天」而不属于某条路线，所以挂在行程篮上：
+   * 挂在 PlanItem 上时，写只能落在某一条 item 上、读却要遍历当天所有 item，
+   * 两边挑中的未必是同一条 —— 一旦当天又加进一条路线（数组里它排在更后面），
+   * 改选和「取消锁定」都会写到新那条、而界面仍读到旧那条，表现是点了完全没反应。
+   * 同理，把路线挪到别的天、或删掉某条路线，也不该顺手丢掉已经订好的住宿。
+   */
+  stays?: Record<number, string>
   /**
    * 「出发前一晚」锁定的住宿 id（来自某条 Route.hotels）。
    *

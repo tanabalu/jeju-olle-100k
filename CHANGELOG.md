@@ -168,6 +168,47 @@ App 端过不了就落地买实体卡兜底。速查卡片「T-money：办卡与
 同步修正的两处连带错误：①「护照在哪买」里的沿线网点列表对齐官方编号（去掉 14-1、补 18-1，并注明 7 号 = 西归浦总部）；
 ②「住」卡片里「西归浦…也是唯一的完步证书领取处」改为「偶来游客中心（总部）所在地，7 号线起点」。
 
+### 行程篮「选择住宿 / 取消住宿」点了没反应：住宿改为按天存储
+
+**症状**：「按天」视图里点「住这家」，或点已锁定那家的「取消锁定」，界面都纹丝不动 —— 依旧显示旧的「已定：XXX」。
+
+**先排除的**：不是 CSS。`DayBoard.module.less` / `StayPickerDrawer.module.less` / `global.less`
+都没有 `pointer-events: none`、`opacity: 0`、`z-index` 冲突或 `disabled`，抽屉走 `createPortal` 挂到
+`document.body`，不存在遮挡或裁剪。按钮的 `onClick` 也一路绑到了 `lockStay`，没有孤儿函数。
+
+**根因**：住宿 `stayId` 存在 `PlanItem` 上，而读写用了两个不同的定位规则 ——
+
+| 操作 | 函数 | 定位规则 |
+|---|---|---|
+| 写 | `setStayItems()` | 当天 **items 数组里最后一条**（`sameDayIdx[len-1]`） |
+| 读 | `stayIdOfDay()` | 当天 **第一条带 `stayId` 的**（遍历即 return） |
+
+`addRoute` 永远把新 item append 到数组尾部，所以**只要某天锁定过住宿、之后又往这天加了一条路线**，
+「最后一条」就换人了：写落到新那条上，读仍然读到旧那条 → 改选和取消双双静默失效。
+
+**修复**（住宿属于「这一天」，不属于某条路线）：
+
+1. `types.ts`：`PlanItem` 删掉 `stayId` / `stayNote`；`Plan` 新增 `stays?: Record<number, string>`（天号 → 酒店 id）。
+2. `dayPlan.ts`：`setStayItems` → **`setPlanStay(plan, day, stayId)`**（解锁后 map 为空则整个字段删掉）；
+   `stayIdOfDay(plan, day)`；新增 **`removeDayStays()`** —— 删掉一整天时，后面几天的锁定跟着整体前移。
+   `assignDayItems` / `removeDayItems` 里删 `stayId` 的语句一并去掉：**挪路线、删路线不再连带丢掉已订住宿**。
+3. `stayMatch.ts`：`suggestStay()` 的第四参由 `items: PlanItem[]` 改为 `plan: Plan | undefined`。
+4. `useActivePlan.ts`：`lockStay` 去掉从未被传值的第 3 参 `note`（连带删掉 `PlanItem.stayNote` 这条死路径），改调 `setPlanStay`。
+5. `DayBoard.tsx` / `PlanPage.tsx`：`buildStays(days, plan, hotels)` 及 `dayStayGeo` 调用点同步。
+
+**顺带修的两个「压根选不到住宿」**：
+
+- `collectHotels()` 注释写着「按 hotel.id 去重」，实际**根本没去重**。`routeTowns` 是多对多，
+  同一家会被多条同镇路线重复挂进来 → 候选列表出现重复项，React 的 `key` 也跟着撞车。已加 `seen` 集合。
+- `StayCard` 推不出住宿建议（`suggestStay` 返回 `null`）时只给一段「去素材管理补录」，**没有任何入口** ——
+  即使当天落脚点附近录过住宿也选不了。已对齐 `PrevStayCard`，补上「查看全部住宿（N 家）」按钮。
+
+**验证**：`npx tsc --noEmit` 与 `npm run build` 均通过；另用 `tsc` 编译产物跑脚本复现旧 bug 并验证
+新行为（改选 / 取消 / JSON 往返 / 删天后前移全部正确）。
+
+**已知取舍**：改结构会丢掉本地已有行程篮里锁过的住宿（`PlanItem.stayId` 字段没了）。按本项目
+「不做 localStorage 历史数据兼容 / 迁移」的约定处理，用户在页面上重新点一次即可。
+
 ## 2026-10-03（续·9）
 
 ### 删掉「近似剖面」：`olleeElevation.ts` 改为由真实轨迹派生

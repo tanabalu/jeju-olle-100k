@@ -7,8 +7,9 @@ import {
   moveInDayItems,
   planDayNumbers,
   removeDayItems,
+  removeDayStays,
   setDirectionItems,
-  setStayItems,
+  setPlanStay,
 } from '../lib/dayPlan'
 import type { RouteDirection } from '../types'
 
@@ -179,11 +180,11 @@ export function useActivePlan() {
     [plan, patchPlan],
   )
 
-  /** 锁定 / 解锁某天的住宿 */
+  /** 锁定 / 解锁某天的住宿（存在 plan.stays 上，与天挂钩、不与某条路线挂钩） */
   const lockStay = useCallback(
-    (day: number, stayId: string | undefined, note?: string) => {
+    (day: number, stayId: string | undefined) => {
       if (!plan) return
-      upsertPlan({ ...plan, items: setStayItems(plan.items, day, stayId, note) })
+      upsertPlan(setPlanStay(plan, day, stayId))
     },
     [plan, upsertPlan],
   )
@@ -210,7 +211,12 @@ export function useActivePlan() {
       if (!plan) return
       const items = removeDayItems(plan.items, day)
       const nums = planDayNumbers(plan)
-      upsertPlan({ ...plan, items, dayCount: Math.max((nums.length ? nums[nums.length - 1] : 1) - 1, 0) || undefined })
+      upsertPlan({
+        ...plan,
+        items,
+        stays: removeDayStays(plan.stays, day),
+        dayCount: Math.max((nums.length ? nums[nums.length - 1] : 1) - 1, 0) || undefined,
+      })
     },
     [plan, upsertPlan],
   )

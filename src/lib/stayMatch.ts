@@ -15,7 +15,7 @@
  * 拿不到的一律返回空/降级，**不编造酒店名**。宁可显示「附近没有已录入的住宿」，
  * 也不能虚构一家看起来合理的民宿 —— 用户会照着找过去。
  */
-import type { Hotel, PlanItem, Route, RouteDirection } from '../types'
+import type { Hotel, Plan, Route, RouteDirection } from '../types'
 import { TRIP_PLANS, type TripPlan } from './tripPlans'
 import { haversineKm } from './geo'
 import type { DayPlan } from './dayPlan'
@@ -139,7 +139,7 @@ function areasCompatible(a: string | undefined, b: string | undefined): boolean 
  * @param day       当天的计算结果（`planDays` 出来的）
  * @param nextDay   下一天（存在时才做「明早出发」的交叉校验）
  * @param hotels    全部住宿候选（来自所有路线，去重后）
- * @param items     plan.items（用于读用户锁定的 stayId）
+ * @param plan      行程篮（用于读用户锁定的住宿 —— 锁在 plan.stays 上，按天存）
  *
  * **每一天都有自己的建议，最后一天也一样** —— 走完最后一段当晚还要落脚，
  * 多半第二天才飞机 / 船返程，把最后一晚漏掉等于把人丢在街上。
@@ -153,7 +153,7 @@ export function suggestStay(
   day: DayPlan,
   nextDay: DayPlan | undefined,
   hotels: LinkedHotel[],
-  items: PlanItem[],
+  plan: Plan | undefined,
 ): StaySuggestion | null {
   if (!day.rows.length) return null
 
@@ -163,7 +163,7 @@ export function suggestStay(
   const nextFirstRoute = nextDay?.rows[0]?.route
   const nextDir = nextDay?.rows[0]?.item.direction
 
-  const lockedId = stayIdOfDay(items, day.day)
+  const lockedId = stayIdOfDay(plan, day.day)
   const locked = lockedId ? hotels.find((h) => h.hotel.id === lockedId) : undefined
   const auto = autoStay(day, nextDay, hotels)
 
@@ -491,10 +491,22 @@ export function rankAllByStart(
 }
 
 /** 把全部路线的住宿收集成候选池（去重靠 id 冲突时的先到先得） */
+/**
+ * 全岛住宿池：跨全部路线收集，**按 hotel.id 去重**。
+ *
+ * 必须去重：同一个城镇的住宿会被挂在多条路线上（routeTowns 是多对多），
+ * 不去重的话候选列表里同一家会出现好几次 —— React 的 `key` 也会跟着撞车。
+ * 同一个 id 保留第一条（顺带记下它挂在哪条路线上，卡片上的来源标注用）。
+ */
 export function collectHotels(routes: Route[]): LinkedHotel[] {
   const out: LinkedHotel[] = []
+  const seen = new Set<string>()
   for (const r of routes) {
-    for (const h of r.hotels ?? []) out.push({ hotel: h, routeId: r.id, routeName: r.name })
+    for (const h of r.hotels ?? []) {
+      if (!h.id || seen.has(h.id)) continue
+      seen.add(h.id)
+      out.push({ hotel: h, routeId: r.id, routeName: r.name })
+    }
   }
   return out
 }

@@ -132,9 +132,8 @@ export function PlanPage() {
    */
   const dayStayGeo = useMemo(() => {
     const m = new Map<number, GeoPoint>()
-    const itemsArr = plan?.items ?? []
     for (const d of planDayNumbers(plan)) {
-      const id = stayIdOfDay(itemsArr, d)
+      const id = stayIdOfDay(plan, d)
       if (!id) continue
       const lh = hotels.find((h) => h.hotel.id === id)
       if (lh) m.set(d, { lng: lh.hotel.lng, lat: lh.hotel.lat })
@@ -142,7 +141,7 @@ export function PlanPage() {
     return m
   }, [plan, hotels])
   const days = useMemo(() => planDays(plan, dayRows, metrics, dayStayGeo), [plan, dayRows, metrics, dayStayGeo])
-  const stays = useMemo(() => buildStays(days, plan?.items ?? [], hotels), [days, plan, hotels])
+  const stays = useMemo(() => buildStays(days, plan, hotels), [days, plan, hotels])
   const backlog = useMemo(() => unassignedRows(dayRows), [dayRows])
   const firstDay = useMemo(() => days.find((d) => d.rows.length > 0), [days])
   /** 「出发前一晚」的住宿建议：依据第一天那条的官方「前一晚住哪」口径 + 离第一天起点的距离 */

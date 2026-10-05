@@ -350,16 +350,13 @@ export function unassignedRows(rows: PlanRow[]): PlanRow[] {
  * 下面是对 `items` 的纯操作。全部返回**新数组**，不改动入参。
  * ------------------------------------------------------------------ */
 
-/** 把某条路线挪到第 day 天（或回待安排）；同时清掉它身上过期的住宿锁定 */
+/** 把某条路线挪到第 day 天（或回待安排）。住宿锁在「天」上，挪路线不动它 */
 export function assignDayItems(items: PlanItem[], routeId: string, day: number | undefined): PlanItem[] {
   return items.map((i) => {
     if (i.routeId !== routeId) return i
     const next: PlanItem = { ...i }
     if (day === undefined) delete next.day
     else next.day = day
-    // 换天了，之前锁的酒店几乎肯定不再适用
-    delete next.stayId
-    delete next.stayNote
     return next
   })
 }
@@ -403,43 +400,54 @@ export function removeDayItems(items: PlanItem[], day: number): PlanItem[] {
     if (i.day === day) {
       const next: PlanItem = { ...i }
       delete next.day
-      delete next.stayId
-      delete next.stayNote
       return next
     }
     return i.day > day ? { ...i, day: i.day - 1 } : i
   })
 }
 
-/** 锁定/解锁某天的住宿（存在当天最后一条上） */
-export function setStayItems(
-  items: PlanItem[],
-  day: number,
-  stayId: string | undefined,
-  note?: string,
-): PlanItem[] {
-  const sameDayIdx: number[] = []
-  items.forEach((i, idx) => {
-    if (i.day === day) sameDayIdx.push(idx)
-  })
-  if (!sameDayIdx.length) return items
-  const target = sameDayIdx[sameDayIdx.length - 1]
-  return items.map((i, idx) => {
-    if (idx !== target) return i
-    const next: PlanItem = { ...i }
-    if (stayId) next.stayId = stayId
-    else delete next.stayId
-    if (note !== undefined && note.trim()) next.stayNote = note
-    else delete next.stayNote
-    return next
-  })
+/**
+ * 锁定 / 解锁某天的住宿。住宿存在 `plan.stays`（按天）而不是挂在某条路线上 ——
+ *
+ * 挂在 item 上时，写只能落在被挑中的那一条上、读却要遍历当天所有 item，
+ * 两边挑中的未必是同一条：一旦当天又加进一条路线（items 数组里它排在更后面），
+ * 改选和「取消锁定」就都写到新那条上，而界面仍读到旧那条 —— 点了完全没反应。
+ * 按天存储让读写走同一个 entry，上面这一类错位从数据结构上就不复存在。
+ *
+ * @returns 新的 plan。解锁后 map 为空时不留空对象，整个字段删掉。
+ */
+export function setPlanStay(plan: Plan, day: number, stayId: string | undefined): Plan {
+  const stays: Record<number, string> = { ...(plan.stays ?? {}) }
+  if (stayId) stays[day] = stayId
+  else delete stays[day]
+  const next: Plan = { ...plan }
+  if (Object.keys(stays).length) next.stays = stays
+  else delete next.stays
+  return next
 }
 
-/** 取出某天锁定的住宿 id（当天任意一条上有就算） */
-export function stayIdOfDay(items: PlanItem[], day: number): string | undefined {
-  for (const i of items) {
-    if (i.day === day && i.stayId) return i.stayId
+/** 取出某天锁定的住宿 id */
+export function stayIdOfDay(plan: Plan | undefined, day: number): string | undefined {
+  return plan?.stays?.[day]
+}
+
+/**
+ * 删掉第 day 天后，之后每天的住宿锁定跟着整体前移一天 ——
+ * 路线是这样移的（`removeDayItems`），住宿不跟着移的话，第 3 天订的酒店会
+ * 落到第 2 天头上。
+ */
+export function removeDayStays(
+  stays: Record<number, string> | undefined,
+  day: number,
+): Record<number, string> | undefined {
+  if (!stays) return undefined
+  const next: Record<number, string> = {}
+  for (const key of Object.keys(stays)) {
+    const n = Number(key)
+    if (n === day) continue
+    // JSON 反序列化后 key 是字符串，用数字下标读会自己转回去
+    next[n > day ? n - 1 : n] = stays[n]
   }
-  return undefined
+  return Object.keys(next).length ? next : undefined
 }
 
