@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { AlbumItem, AppSettings, ElevSample, Hotel, ImageRef, Plan, PlanItem, Route } from '../types'
-import { store, syncBundleAssets as syncBundleAssetsFromStore, type ChecklistState, type UiState } from '../lib/storage'
+import { store, syncBundleData as syncBundleDataFromStore, type ChecklistState, type UiState } from '../lib/storage'
+import { bundleFingerprint } from '../lib/bundleVersion'
 import { PREP_GROUPS, PREP_PRESETS, normItemText } from '../lib/prep'
 import { buildSeedRoutes } from '../lib/seed'
 import { mergeStays } from '../lib/staySource'
@@ -243,6 +244,16 @@ interface DataApi {
   ui: UiState
   updateUi: (patch: Partial<UiState>) => void
   reload: () => void
+  /**
+   * 打包数据（路线 / 住宿 / 看点）有了新版本，本机那份还没跟上。
+   * 由指纹判定：`src/lib/bundleVersion.ts`。真 = 页面顶部该弹更新提示。
+   */
+  bundleOutdated: boolean
+  /**
+   * 把本机数据整段换成当前打包的那份（路线 / 住宿 / 看点），并把版本记成最新。
+   * 返回覆盖的路线数、写入的住宿条数、看点数。
+   */
+  applyBundleUpdate: () => { routes: number; hotels: number; sights: number }
   /** public/photos/manifest.json 里的配图表 */
   photoManifest: PhotoManifest
   /** public/photos/maps.json 里的官方路线图表 */
@@ -262,12 +273,6 @@ interface DataApi {
    * `ids` 省略 = 整份加入；已在清单里的（同 id 或同文案）会被跳过，不会重复加。
    */
   addPresetItems: (presetId: string, ids?: string[]) => void
-  /**
-   * 用打包真源（随代码发布的最新数据）整段覆盖本机的住宿与看点。
-   * 素材后台已下线，本机不再有手填来源，系统那份就是唯一权威 —— 直接替换、不合并。
-   * 返回更新到的路线数、写入的住宿条数、看点数。
-   */
-  syncBundleAssets: () => { routes: number; hotels: number; sights: number }
   /** 把某份备选清单已加入的条目整批移出总清单 */
   removePresetItems: (presetId: string) => void
   /** 把单条备选条目移出总清单（加入的反操作） */
@@ -307,6 +312,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     extras: [],
   })
   const [fatalError, setFatalError] = useState<Error | null>(null)
+  /** 打包数据有新版、本机还没跟上（页面顶部弹黄条提示更新） */
+  const [bundleOutdated, setBundleOutdated] = useState(false)
 
   const reload = useCallback(() => {
     setLoading(true)
@@ -314,11 +321,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     requestAnimationFrame(() => {
       try {
         let r = store.getRoutes()
-        if (r.length === 0) {
+        // 「本机有没有数据」要在 seed 之前判断：首次打开 seed 出来的就是最新的，不该提示更新；
+        // 而老用户（本机有数据、但没记过版本）说明那份数据来自旧版代码，必须提示。
+        const firstRun = r.length === 0
+        if (firstRun) {
           r = buildSeedRoutes()
           store.setRoutes(r)
         }
         setRawRoutes(r)
+        // 数据版本对账：本机记录的指纹 vs 当前代码里这份数据的指纹
+        const fp = bundleFingerprint()
+        const known = store.getBundleVersion()
+        if (!known) store.setBundleVersion(fp)
+        setBundleOutdated(!firstRun && known !== fp)
         setPlans(store.getPlans())
         setSettings(store.getSettings())
         setChecklist(store.getChecklist())
@@ -337,8 +352,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     reload()
   }, [reload])
 
-  const syncBundleAssets = useCallback(() => {
-    const res = syncBundleAssetsFromStore()
+  const applyBundleUpdate = useCallback(() => {
+    const res = syncBundleDataFromStore()
     reload()
     return res
   }, [reload])
@@ -595,6 +610,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       settings,
       ui,
       updateUi,
+      bundleOutdated,
       upsertRoute,
       removeRoute,
       getRoute,
@@ -607,7 +623,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createPlan,
       updateSettings,
       reload,
-      syncBundleAssets,
+      applyBundleUpdate,
       photoManifest,
       routeMaps,
       stays,
@@ -641,7 +657,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createPlan,
       updateSettings,
       reload,
-      syncBundleAssets,
+      applyBundleUpdate,
+      bundleOutdated,
       toggleCheck,
       toggleSkip,
       resetChecklist,

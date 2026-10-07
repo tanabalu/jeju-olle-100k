@@ -8,12 +8,12 @@
  * 所以这里挂一个内存实现上去即可。
  */
 import { beforeEach, describe, expect, it } from 'vitest'
-import { exportBackup, importBackup, normalizePlan, normalizeRoute, store, syncBundleAssets } from '../src/lib/storage'
+import { exportBackup, importBackup, normalizePlan, normalizeRoute, store, syncBundleData } from '../src/lib/storage'
 import type { UiState } from '../src/lib/storage'
 import type { AppSettings, Plan, Route } from '../src/types'
 import { item, plan, route, hotel } from './fixtures'
-import { SEED_STAYS } from '../src/lib/seedStays'
-import { DEFAULT_SIGHTS } from '../src/lib/sightsData'
+import { buildSeedRoutes } from '../src/lib/seed'
+import { bundleFingerprint } from '../src/lib/bundleVersion'
 
 /** 内存版 localStorage */
 function installLocalStorage(): void {
@@ -175,53 +175,57 @@ describe('settings / ui 的兜底', () => {
   })
 })
 
-describe('syncBundleAssets', () => {
+describe('syncBundleData', () => {
   /**
-   * 素材后台下线后，系统打包的那份住宿 / 看点是唯一权威，所以这里的行为是**覆盖**不是合并：
-   * 本机里真源已经没有的条目必须消失，否则「删了数据页面上还在」会重演。
+   * 素材后台下线后，系统打包的那份路线 / 住宿 / 看点是唯一权威，所以这里的行为是
+   * **覆盖**不是合并：本机里真源已经没有的条目必须消失，否则「删了数据页面上还在」会重演。
    */
+  const seed = buildSeedRoutes()
+  const target = seed[0]
+  const findIt = () => store.getRoutes().find((r) => r.id === target.id)
+
   it('用系统数据整段覆盖本机的住宿与看点（旧的残留条目消失）', () => {
-    const stale = route({
-      id: '01',
-      code: '01',
-      hotels: [hotel({ id: 'osm_node_已删掉的民宿' })],
-      sights: [],
-    })
+    const stale = { ...target, hotels: [hotel({ id: 'osm_node_真源已删掉的民宿' })], sights: [] }
     store.setRoutes([stale])
-    const res = syncBundleAssets()
+    const res = syncBundleData()
 
-    const after = store.getRoutes()[0]
-    expect(res.routes).toBe(1)
-    expect(after.hotels.map((h) => h.id)).not.toContain('osm_node_已删掉的民宿')
+    const after = findIt()
+    expect(res.routes).toBe(seed.length)
+    expect(after?.hotels.map((h) => h.id)).not.toContain('osm_node_真源已删掉的民宿')
     // 覆盖后的内容就是真源那份，不是「并进真源」
-    expect(after.hotels.map((h) => h.id)).toEqual(SEED_STAYS['01'].map((h) => h.id))
-    expect(after.sights.map((s) => s.id)).toEqual(DEFAULT_SIGHTS['01'].map((s) => s.id))
-    expect(res.hotels).toBe(SEED_STAYS['01'].length)
-    expect(res.sights).toBe(DEFAULT_SIGHTS['01'].length)
+    expect(after?.hotels.map((h) => h.id)).toEqual(target.hotels.map((h) => h.id))
+    expect(after?.sights.map((s) => s.id)).toEqual(target.sights.map((s) => s.id))
   })
 
-  it('真源里没有这条路线时，住宿与看点被清空而不是留着旧的', () => {
-    const r = route({
-      id: '99',
-      code: '99',
-      hotels: [hotel({ id: 'osm_node_x' })],
-      sights: [],
-    })
-    store.setRoutes([r])
-    syncBundleAssets()
-    const after = store.getRoutes()[0]
-    expect(after.hotels).toEqual([])
-    expect(after.sights).toEqual([])
+  it('路线本身也以系统数据为准（本机改过的里程会被覆盖回来）', () => {
+    const edited = { ...target, name: '本机改过的名字', manualDistanceKm: 999 }
+    store.setRoutes([edited])
+    syncBundleData()
+    const after = findIt()
+    expect(after?.name).toBe(target.name)
+    expect(after?.manualDistanceKm).toBe(target.manualDistanceKm)
   })
 
-  it('只动住宿与看点，路线本身 / 相册不受影响', () => {
-    const r = route({ id: '01', code: '01' })
-    const before = { ...r, hotels: [], sights: [] }
-    store.setRoutes([before])
-    syncBundleAssets()
-    const after = store.getRoutes()[0]
-    expect(after.points).toEqual(before.points)
-    expect(after.album).toEqual(before.album)
-    expect(after.name).toBe(before.name)
+  it('只保留用户自己的相册，不看齐系统数据', () => {
+    const mine = {
+      ...target,
+      album: [{ id: 'album_mine', image: { kind: 'url' as const, value: 'photos/mine.jpg' } }],
+    }
+    store.setRoutes([mine])
+    syncBundleData()
+    expect(findIt()?.album.map((a) => a.id)).toEqual(['album_mine'])
+  })
+
+  it('系统里没有的本机路线（备份导入来的）不会被删', () => {
+    const imported = route({ id: 'imported_1', code: '99' })
+    store.setRoutes([imported])
+    syncBundleData()
+    expect(store.getRoutes().some((r) => r.id === 'imported_1')).toBe(true)
+  })
+
+  it('同步后把版本记成最新 —— 再对账就不算过期了', () => {
+    store.setBundleVersion('一个过期的指纹')
+    syncBundleData()
+    expect(store.getBundleVersion()).toBe(bundleFingerprint())
   })
 })

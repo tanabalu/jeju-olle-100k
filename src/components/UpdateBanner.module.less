@@ -1,0 +1,71 @@
+/* 组件专属样式（CSS Modules + Less，局部作用域） */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid #f0d68a;
+  border-radius: var(--radius);
+  background: #fff8e1;
+  color: #7a5b00;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* 「立即更新」在黄底上用品牌色实心，比中性按钮更像主行动点 */
+.update {
+  flex: none;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.update:hover {
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+}
+.update:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 关闭只关掉本次访问，下次打开还会提示 —— 数据确实还是旧的 */
+.close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.close:hover {
+  background: rgba(122, 91, 0, 0.1);
+}
+
+@media (max-width: 640px) {
+  .banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .text {
+    flex-basis: 100%;
+  }
+}

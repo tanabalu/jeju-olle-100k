@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { HashRouter, Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { FeedbackProvider } from './components/Feedback'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { UpdateBanner } from './components/UpdateBanner'
 import { DataProvider, useData, type PhotoManifest } from './store/DataContext'
 import { RoutesPage } from './pages/RoutesPage'
 import styles from './App.module.less'
@@ -261,6 +262,7 @@ export default function App() {
               </>
             )}
             <main className={`${styles['content']}`}>
+              <UpdateBanner />
               <PageRoutes />
             </main>
             <footer className={`${styles['footer']}`}>

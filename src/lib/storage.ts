@@ -12,8 +12,8 @@ import type {
 } from '../types'
 import type { PrepItem } from './prep'
 import { uid } from './id'
-import { DEFAULT_SIGHTS } from './sightsData'
-import { SEED_STAYS } from './seedStays'
+import { buildSeedRoutes } from './seed'
+import { bundleFingerprint } from './bundleVersion'
 
 const K_ROUTES = 'jejuolle100k.routes'
 const K_PLANS = 'jejuolle100k.plans'
@@ -21,6 +21,8 @@ const K_SETTINGS = 'jejuolle100k.settings'
 const K_PLAN_DRAFT = 'jejuolle100k.planDraft'
 const K_CHECKLIST = 'jejuolle100k.checklist'
 const K_UI = 'jejuolle100k.ui'
+/** 本机这份数据对应的是哪个版本的打包数据（bundleFingerprint），用于检测数据升级 */
+const K_BUNDLE_VERSION = 'jejuolle100k.bundleVersion'
 
 /** 从备选清单（女士常用 / 男士常用 / 大疆 / 相机 / 无人机）加进总清单的条目 */
 export interface ChecklistExtra extends PrepItem {
@@ -197,6 +199,10 @@ export const store = {
 
   getUi: () => normalizeUi(read<Partial<UiState> | null>(K_UI, EMPTY_UI)),
   setUi: (v: UiState) => write(K_UI, normalizeUi(v)),
+
+  /** 本机数据同步自哪个版本的打包数据；空串 = 从未记录（首次打开） */
+  getBundleVersion: () => read<string>(K_BUNDLE_VERSION, ''),
+  setBundleVersion: (v: string) => write(K_BUNDLE_VERSION, v),
 }
 
 export function emptyHotel(partial: Partial<Hotel> = {}): Hotel {
@@ -263,37 +269,51 @@ export function importBackup(text: string, mode: 'merge' | 'replace'): { routes:
 }
 
 /**
- * 用**打包真源**（随代码发布的那份数据）整段覆盖本机的住宿与看点。
+ * 用**打包真源**（随代码发布的那份数据）整段覆盖本机的路线 / 住宿 / 看点。
  *
- * 背景：素材管理后台已下线，本机的住宿 / 看点不再有人工手填的来源 —— 系统里打包的那份
- * 就是唯一权威。所以这里不做「按 id 幂等并入」，而是**直接替换**：
- * - 住宿：`src/lib/seedStays.ts`（从 src/data/stays.json 派生）
+ * 背景：素材管理后台已下线，本机的路线 / 住宿 / 看点不再有人工手填的来源 —— 系统里打包的
+ * 那份就是唯一权威。所以这里不做「按 id 幂等并入」，而是**直接替换**：
+ * - 路线：`buildSeedRoutes()`（坐标 / 里程 / 难度 / 轨迹，含下面两样）
+ * - 住宿：`SEED_STAYS`（从 src/data/stays.json 派生）
  * - 看点：`DEFAULT_SIGHTS`（curated_sights.json 生成）
  *
- * 这样代码里改了住宿 / 看点时，点一次就能让本机跟上最新版本，不用清数据重新 seed。
- * 只动 `route.hotels` 与 `route.sights`，路线本身、行程篮、行前清单、相册一律不动。
+ * 这样代码里改了数据、重新部署后，用户点一次（页面顶部的黄条）就能跟上最新版本，
+ * 不用清缓存、也不用重新 seed。
+ *
+ * **保留什么**：只有用户在本机真正拥有的内容 —— 相册里自己上传的照片与后台设过的封面。
+ * 行程篮、行前清单、设置一律不动。系统里已经没有的本机路线（从备份导入来的）
+ * 也原样保留：那属于用户自己的数据，不是系统数据的旧副本。
  *
  * ⚠️ 副作用：行程篮里锁定的住宿如果在新数据里已经不存在（真源删了），锁定会失效 ——
  *    这是数据更新应有的结果，不是 bug。
  *
- * @returns routes 更新到的路线数，hotels 写入的住宿条数，sights 写入的看点数
+ * @returns routes 覆盖的路线数，hotels 写入的住宿条数，sights 写入的看点数
  */
-export function syncBundleAssets(): { routes: number; hotels: number; sights: number } {
-  const routes = store.getRoutes()
-  let lines = 0
+export function syncBundleData(): { routes: number; hotels: number; sights: number } {
+  const fresh = buildSeedRoutes()
+  const current = store.getRoutes()
+  const oldById = new Map(current.map((r) => [r.id, r]))
   let hotels = 0
   let sights = 0
-  for (const r of routes) {
-    if (!r.code) continue
-    const nextHotels = SEED_STAYS[r.code] ?? []
-    const nextSights = DEFAULT_SIGHTS[r.code] ?? []
-    r.hotels = nextHotels
-    r.sights = nextSights
-    hotels += nextHotels.length
-    sights += nextSights.length
-    lines++
-  }
-  store.setRoutes(routes)
-  return { routes: lines, hotels, sights }
+
+  const next: Route[] = fresh.map((r) => {
+    hotels += r.hotels.length
+    sights += r.sights.length
+    const old = oldById.get(r.id)
+    if (!old) return r
+    return {
+      ...r,
+      album: old.album,
+      cover: old.cover,
+      createdAt: old.createdAt ?? r.createdAt,
+    }
+  })
+  const freshIds = new Set(fresh.map((r) => r.id))
+  for (const r of current) if (!freshIds.has(r.id)) next.push(r)
+
+  store.setRoutes(next)
+  // 记下这次同步对应的版本，之后指纹不变就不再提示
+  store.setBundleVersion(bundleFingerprint())
+  return { routes: fresh.length, hotels, sights }
 }
 
