@@ -11,6 +11,7 @@ import type { AlbumItem, AppSettings, ElevSample, Hotel, ImageRef, Plan, PlanIte
 import { store, mergeDefaultSights as mergeDefaultSightsFromStore, type ChecklistState, type UiState } from '../lib/storage'
 import { PREP_GROUPS, PREP_PRESETS, normItemText } from '../lib/prep'
 import { buildSeedRoutes } from '../lib/seed'
+import { mergeStays } from '../lib/staySource'
 import { uid } from '../lib/id'
 // 住宿唯一真源（OSM / TourAPI / Kakao / 人工核对合并产物），随包打包进 JS。
 // 改完 src/data/stays.json 后需重新构建；不再运行时 fetch，避免数据在源码里存两份。
@@ -39,47 +40,7 @@ export interface StaysManifest {
   routeTowns: Record<string, string[]>
 }
 
-/**
- * 把「官方建议住这的城镇」的住宿池合并进路线（不落库，对齐 mergeAssets 范式）。
- * 严格按 routeTowns 映射收集；跨城镇去重按 hotel.id，避免同一家被挂多次。
- *
- * ## 对账而不是追加（2026-10-02 修）
- * 旧实现是「只把 bundle 里的新 id 追加进 route.hotels」，于是路线在 localStorage 里存的那份
- * 住宿副本（`seed.ts` 首次 seed 时写入并持久化）永远盖住打包真源：改了 `stays.json` 重新构建后，
- * 同 id 的旧副本不更新、bundle 已删的条目不消失，点「重新加载数据」只是把同一份旧副本再读一遍，
- * 只有「清空全部数据」触发重新 seed 才刷新。
- *
- * 新口径：bundle 始终为权威 —— 这条路线官方建议的城镇对应的住宿取**最新打包数据**；
- * 只保留「id 不在全局 bundle 里、纯属后台手填」的住宿（不随 bundle 刷新、也不会被误删）。
- * 这样 reload 即可反映最新 `stays.json`，又不会丢素材管理里手补的住宿。
- */
-function mergeStays(
-  route: Route,
-  townsByKo: Record<string, Hotel[]>,
-  routeTowns: Record<string, string[]>,
-  bundleIds: Set<string>,
-): Route {
-  const codes = route.code ? routeTowns[route.code] : undefined
-  // 这条路线官方建议住的城市对应的住宿（始终取最新打包数据，刷新即生效）
-  const bundle: Hotel[] = []
-  const seen = new Set<string>()
-  for (const ko of codes ?? []) {
-    for (const h of townsByKo[ko] ?? []) {
-      if (h.id && !seen.has(h.id)) {
-        seen.add(h.id)
-        bundle.push(h)
-      }
-    }
-  }
-  // 后台手填：id 不在全局 bundle 里的才保留（bundle 删了的 / 改映射不再推荐的，都随 bundle 走）
-  const manualOnly = route.hotels.filter((h) => h.id && !bundleIds.has(h.id))
-  const next = [...bundle, ...manualOnly]
-  // 内容（含顺序）与现有一致就不新建 route 对象，避免每次渲染都触发下游 memo 重算
-  if (next.length === route.hotels.length && next.every((h, i) => h === route.hotels[i])) {
-    return route
-  }
-  return { ...route, hotels: next }
-}
+/** 住宿真源的合并逻辑在 src/lib/staySource.ts（纯函数，可单测） */
 
 export interface PhotoEntry {
   /** 相对站点根目录的原图路径，如 photos/olle-01.jpg */

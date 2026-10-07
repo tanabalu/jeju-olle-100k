@@ -25,7 +25,8 @@ const NAV = [
   { to: '/', label: '路线' },
   { to: '/plan', label: '行程篮' },
   { to: '/prep', label: '行前准备' },
-  { to: '/admin', label: '素材管理' },
+  // 素材管理后台入口：对客站点不展示。后台页面本身还在，直接访问 /admin 仍可进入。
+  // { to: '/admin', label: '素材管理' },
   { to: '/settings', label: '设置' },
 ]
 

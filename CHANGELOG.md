@@ -5,6 +5,32 @@
 
 ## 2026-10-07
 
+### 修：真源删掉的住宿，还赖在行程篮的推荐列表里
+
+**现象**：清掉 854 条抓取住宿后，页面上住宿确实少了，但**行程篮「今晚住哪」的候选里它们还在**。
+
+**根因**：`DataContext.mergeStays` 判断「这条是不是后台手填」用的是
+`!bundleIds.has(h.id)` —— **当前 bundle 里没有 = 手填，保留**。
+被删的那些 id 恰好都不在 bundle 里，于是每一条都被当成「用户在后台手填的」留了下来，
+真源删数据这个动作对旧 localStorage 副本完全无效。
+
+**改法**：改为**按 id 命名空间判定来源**（`src/lib/staySource.ts` 的 `isBundleStay`）：
+`osm_` / `tourapi_` / `kakao_` / `manual_` 开头的都是 bundle 来源 ——
+**bundle 里没有 = 真源不想要了，删**；只有 `hotel_` 开头（`emptyHotel()` 用 `uid('hotel')` 生成的）
+才当后台手填保留。这样不用清 localStorage，刷新即生效。
+
+**顺带**：`mergeStays` 从 `DataContext.tsx` 移到 `src/lib/staySource.ts`（纯函数），
+新增 `test/staySource.test.ts` 7 条，把「删掉的不能残留 / 手填的不能冲掉」锁住。
+
+### 隐藏素材管理后台菜单
+
+`src/App.tsx` 的 `NAV` 里注释掉 `{ to: '/admin' }` 一项（保留原行，随时可去掉注释恢复）。
+`/admin` 路由**没有删**，直接输地址仍可进后台。
+
+**未动**：其余 7 处「去素材管理」的入口链接还在（`RoutesPage` ×2、`RouteDetailPage` ×1、
+`DayBoard` ×3、`StayPickerDrawer` ×1）—— 它们是「这里没住宿，去补录」的引导文案，
+要不要一起隐藏另说。
+
 ### 清掉「脚本抓取」的住宿条目（删除 854 / 970 条）
 
 **用户口径**：`src/data/stays.json` 里凡是**同时没有中文名和英文名**的条目（即脚本从 OSM / Overpass
