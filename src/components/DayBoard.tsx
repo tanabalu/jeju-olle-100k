@@ -532,7 +532,8 @@ function StayCard({ day, stay, picks, onLockStay, onOpenPicker }: StayCardProps)
         </div>
         <div className={`${styles['stay-reason']}`}>
           这条路线没有任何住宿数据可推：既没有官方的住宿建议口径，也没录入过附近的住宿。
-          去<Link to="/admin">素材管理</Link>给路线补录住宿后，这里会自动出候选清单。
+          {/* 素材管理入口对客站点不展示，原文保留在此：
+          去<Link to="/admin">素材管理</Link>给路线补录住宿后，这里会自动出候选清单。 */}
         </div>
         {/* 推不出区域不代表没得住：这一天落脚点附近录过住宿的话，仍然可以从抽屉里挑一家 ——
             与前夜卡同一口径（早期只有前夜卡给了这个入口，每晚这边漏了，等于彻底选不了） */}
@@ -602,8 +603,9 @@ function StayCard({ day, stay, picks, onLockStay, onOpenPicker }: StayCardProps)
       ) : (
         <div className={`${styles['stay-nodata']}`}>
           附近 8 km 内没有已录入的住宿 ——
-          <Link to="/admin">去素材管理补录</Link>后，这里会自动列出候选并按距离排序。
-          在此之前，上面那条区域建议就是全部可用信息。
+          {/* 素材管理入口对客站点不展示，原文保留在此：
+          <Link to="/admin">去素材管理补录</Link>后，这里会自动列出候选并按距离排序。在此之前， */}
+          上面那条区域建议就是全部可用信息。
         </div>
       )}
       {/* 卡片上只陈列前 5 条；全量（含 8 km 以外的）在抽屉里翻，避免把当天这列撑成一根长条 */}
@@ -651,8 +653,9 @@ function PrevStayCard({ prev, picks, note, onSetNote, onLock, onOpenPicker }: Pr
           <span className={`${styles['stay-label']}`}>🛏 前一晚住</span>
         </div>
         <div className={`${styles['stay-reason']}`}>
-          第一天那条路线没有官方的前夜住宿建议，也推不出所在区域 ——
-          去<Link to="/admin">素材管理</Link>补录住宿后这里会自动出候选。
+          第一天那条路线没有官方的前夜住宿建议，也推不出所在区域。
+          {/* 素材管理入口对客站点不展示，原文保留在此：
+          去<Link to="/admin">素材管理</Link>补录住宿后这里会自动出候选。 */}
         </div>
         {/* 推不出区域不代表没得住：起点附近录过住宿的话，仍然可以从抽屉里挑一家 */}
         {picks.length > 0 && (

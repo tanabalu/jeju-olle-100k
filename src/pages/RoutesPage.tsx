@@ -119,9 +119,10 @@ export function RoutesPage() {
           ]}
           ariaLabel="排序方式"
         />
+        {/* 素材管理入口对客站点不展示，原文保留在此：
         <Link to="/admin" className="btn btn-sm">
           管理素材
-        </Link>
+        </Link> */}
       </div>
 
       {loading ? (
@@ -129,9 +130,10 @@ export function RoutesPage() {
       ) : list.length === 0 ? (
         <div className="empty">
           <p>没有匹配的路线。</p>
+          {/* 素材管理入口对客站点不展示，原文保留在此：
           <Link to="/admin" className="btn btn-primary">
             去添加第一条路线
-          </Link>
+          </Link> */}
         </div>
       ) : (
         <div className="grid-cards">

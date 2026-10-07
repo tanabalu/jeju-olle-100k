@@ -159,9 +159,10 @@ export function RouteDetailPage() {
           >
             {added ? '已加入行程篮' : '加入行程篮'}
           </button>
+          {/* 素材管理入口对客站点不展示，原文保留在此：
           <Link to={`/admin?route=${route.id}`} className="btn">
             编辑
-          </Link>
+          </Link> */}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+// 素材管理入口全部注释后本文件不再用 Link（原文都在注释里，取消注释时记得一并恢复）
+// import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import type { Hotel } from '../types'
 import { STAY_SEARCH_KM } from '../lib/stayMatch'
@@ -224,8 +225,10 @@ export function StayPickerDrawer({
         <div className={`${styles.body}`}>
           {rows.length === 0 ? (
             <div className={`${styles.empty}`}>
-              还没有录入任何住宿 —— 去<Link to="/admin">素材管理</Link>
-              给路线补录后，这里会列出全岛住宿并按距离排序。
+              还没有录入任何住宿。
+              {/* 素材管理入口对客站点不展示，原文保留在此：
+              还没有录入任何住宿 —— 去<Link to="/admin">素材管理</Link>给路线补录后，
+              这里会列出全岛住宿并按距离排序。 */}
             </div>
           ) : filtered.length === 0 ? (
             <div className={`${styles.empty}`}>没有匹配的住宿。</div>

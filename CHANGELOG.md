@@ -22,14 +22,25 @@
 **顺带**：`mergeStays` 从 `DataContext.tsx` 移到 `src/lib/staySource.ts`（纯函数），
 新增 `test/staySource.test.ts` 7 条，把「删掉的不能残留 / 手填的不能冲掉」锁住。
 
-### 隐藏素材管理后台菜单
+### 隐藏素材管理后台的所有入口
 
-`src/App.tsx` 的 `NAV` 里注释掉 `{ to: '/admin' }` 一项（保留原行，随时可去掉注释恢复）。
-`/admin` 路由**没有删**，直接输地址仍可进后台。
+导航菜单 + 页面里 7 处「去素材管理」链接**全部注释掉**（原文一行不删，都留在 JSX 注释里，
+取消注释即可恢复）。`/admin` 路由本身没删，直接输地址仍能进后台。
 
-**未动**：其余 7 处「去素材管理」的入口链接还在（`RoutesPage` ×2、`RouteDetailPage` ×1、
-`DayBoard` ×3、`StayPickerDrawer` ×1）—— 它们是「这里没住宿，去补录」的引导文案，
-要不要一起隐藏另说。
+| 位置 | 原入口 |
+|---|---|
+| `src/App.tsx` | 顶部导航「素材管理」 |
+| `src/pages/RoutesPage.tsx` | 工具栏「管理素材」按钮、空状态「去添加第一条路线」 |
+| `src/pages/RouteDetailPage.tsx` | 详情页「编辑」按钮 |
+| `src/components/DayBoard.tsx` ×3 | 今晚住 / 附近没住宿 / 前一晚住 三处空态引导 |
+| `src/components/StayPickerDrawer.tsx` | 抽屉空态引导 |
+
+**顺带调了两处标点**（不然句子会断在破折号上）：DayBoard 前夜卡「…也推不出所在区域 ——」改句号、
+StayPickerDrawer「还没有录入任何住宿 ——」改句号。
+**顺带注释了 `StayPickerDrawer.tsx` 的 `Link` import** —— 它是唯一只因这些入口才 import Link 的文件，
+留着会触发 `noUnusedLocals`。
+
+**未动**：`AdminPage.tsx` 及其子组件（后台页面本身完整保留）。
 
 ### 清掉「脚本抓取」的住宿条目（删除 854 / 970 条）
 
