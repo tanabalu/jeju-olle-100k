@@ -8,10 +8,12 @@
  * 所以这里挂一个内存实现上去即可。
  */
 import { beforeEach, describe, expect, it } from 'vitest'
-import { exportBackup, importBackup, normalizePlan, normalizeRoute, store } from '../src/lib/storage'
+import { exportBackup, importBackup, normalizePlan, normalizeRoute, store, syncBundleAssets } from '../src/lib/storage'
 import type { UiState } from '../src/lib/storage'
 import type { AppSettings, Plan, Route } from '../src/types'
-import { item, plan, route } from './fixtures'
+import { item, plan, route, hotel } from './fixtures'
+import { SEED_STAYS } from '../src/lib/seedStays'
+import { DEFAULT_SIGHTS } from '../src/lib/sightsData'
 
 /** 内存版 localStorage */
 function installLocalStorage(): void {
@@ -170,5 +172,56 @@ describe('settings / ui 的兜底', () => {
     expect(ui.prepOnlyTodo).toBe(false)
     expect(ui.planMapStayMode).toBe('all')
     expect(ui.prepGroupsCollapsed).toEqual([])
+  })
+})
+
+describe('syncBundleAssets', () => {
+  /**
+   * 素材后台下线后，系统打包的那份住宿 / 看点是唯一权威，所以这里的行为是**覆盖**不是合并：
+   * 本机里真源已经没有的条目必须消失，否则「删了数据页面上还在」会重演。
+   */
+  it('用系统数据整段覆盖本机的住宿与看点（旧的残留条目消失）', () => {
+    const stale = route({
+      id: '01',
+      code: '01',
+      hotels: [hotel({ id: 'osm_node_已删掉的民宿' })],
+      sights: [],
+    })
+    store.setRoutes([stale])
+    const res = syncBundleAssets()
+
+    const after = store.getRoutes()[0]
+    expect(res.routes).toBe(1)
+    expect(after.hotels.map((h) => h.id)).not.toContain('osm_node_已删掉的民宿')
+    // 覆盖后的内容就是真源那份，不是「并进真源」
+    expect(after.hotels.map((h) => h.id)).toEqual(SEED_STAYS['01'].map((h) => h.id))
+    expect(after.sights.map((s) => s.id)).toEqual(DEFAULT_SIGHTS['01'].map((s) => s.id))
+    expect(res.hotels).toBe(SEED_STAYS['01'].length)
+    expect(res.sights).toBe(DEFAULT_SIGHTS['01'].length)
+  })
+
+  it('真源里没有这条路线时，住宿与看点被清空而不是留着旧的', () => {
+    const r = route({
+      id: '99',
+      code: '99',
+      hotels: [hotel({ id: 'osm_node_x' })],
+      sights: [],
+    })
+    store.setRoutes([r])
+    syncBundleAssets()
+    const after = store.getRoutes()[0]
+    expect(after.hotels).toEqual([])
+    expect(after.sights).toEqual([])
+  })
+
+  it('只动住宿与看点，路线本身 / 相册不受影响', () => {
+    const r = route({ id: '01', code: '01' })
+    const before = { ...r, hotels: [], sights: [] }
+    store.setRoutes([before])
+    syncBundleAssets()
+    const after = store.getRoutes()[0]
+    expect(after.points).toEqual(before.points)
+    expect(after.album).toEqual(before.album)
+    expect(after.name).toBe(before.name)
   })
 })

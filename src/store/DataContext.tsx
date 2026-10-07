@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { AlbumItem, AppSettings, ElevSample, Hotel, ImageRef, Plan, PlanItem, Route } from '../types'
-import { store, mergeDefaultSights as mergeDefaultSightsFromStore, type ChecklistState, type UiState } from '../lib/storage'
+import { store, syncBundleAssets as syncBundleAssetsFromStore, type ChecklistState, type UiState } from '../lib/storage'
 import { PREP_GROUPS, PREP_PRESETS, normItemText } from '../lib/prep'
 import { buildSeedRoutes } from '../lib/seed'
 import { mergeStays } from '../lib/staySource'
@@ -263,11 +263,11 @@ interface DataApi {
    */
   addPresetItems: (presetId: string, ids?: string[]) => void
   /**
-   * 把官方默认看点（DEFAULT_SIGHTS / curated_sights.json）按 id 幂等并入现有路线。
-   * 默认种子只在首次打开写入，老用户需主动触发才能拿到新补的看点（无损、不覆盖用户已有数据）。
-   * 返回命中的路线数、实际新增看点数、被补全图片的已有看点数。
+   * 用打包真源（随代码发布的最新数据）整段覆盖本机的住宿与看点。
+   * 素材后台已下线，本机不再有手填来源，系统那份就是唯一权威 —— 直接替换、不合并。
+   * 返回更新到的路线数、写入的住宿条数、看点数。
    */
-  mergeDefaultSights: () => { lines: number; added: number; updated: number }
+  syncBundleAssets: () => { routes: number; hotels: number; sights: number }
   /** 把某份备选清单已加入的条目整批移出总清单 */
   removePresetItems: (presetId: string) => void
   /** 把单条备选条目移出总清单（加入的反操作） */
@@ -337,8 +337,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     reload()
   }, [reload])
 
-  const mergeDefaultSights = useCallback(() => {
-    const res = mergeDefaultSightsFromStore()
+  const syncBundleAssets = useCallback(() => {
+    const res = syncBundleAssetsFromStore()
     reload()
     return res
   }, [reload])
@@ -607,7 +607,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createPlan,
       updateSettings,
       reload,
-      mergeDefaultSights,
+      syncBundleAssets,
       photoManifest,
       routeMaps,
       stays,
@@ -641,7 +641,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createPlan,
       updateSettings,
       reload,
-      mergeDefaultSights,
+      syncBundleAssets,
       toggleCheck,
       toggleSkip,
       resetChecklist,

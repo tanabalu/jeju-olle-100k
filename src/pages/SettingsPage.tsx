@@ -12,7 +12,7 @@ import styles from './SettingsPage.module.less'
 const RELOAD_MIN_SPIN_MS = 450
 
 export function SettingsPage() {
-  const { settings, updateSettings, reload, loading, mergeDefaultSights } = useData()
+  const { settings, updateSettings, reload, loading, syncBundleAssets } = useData()
   const toast = useToast()
   const confirm = useConfirm()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -43,19 +43,20 @@ export function SettingsPage() {
     reload()
   }
 
-  const handleMergeSights = async () => {
+  const handleSyncAssets = async () => {
     if (
       await confirm({
-        title: '合并官方默认看点',
+        title: '更新住宿与看点',
         message:
-          '会把官方补充的知名景点（涉地可支、正房瀑布等 8 处）按 id 并入你现有路线；已有看点不会被覆盖，不影响路线 / 行程篮 / 住宿等其它数据。确定继续？',
-        confirmText: '合并',
+          '会用站点当前版本的住宿与看点数据覆盖本机已存的那份。路线、行程篮、行前清单、相册不受影响。若你在行程篮里锁定过的住宿在新数据里已不存在，那几条锁定会自动解除。确定继续？',
+        confirmText: '更新',
       })
     ) {
-      const res = mergeDefaultSights()
-      const parts = [`${res.lines} 条线`, `新增 ${res.added} 处看点`]
-      if (res.updated > 0) parts.push(`补全 ${res.updated} 处封面`)
-      toast(`已合并：${parts.join('，')}`, 'success')
+      const res = syncBundleAssets()
+      toast(
+        `已更新：${res.routes} 条路线、${res.hotels} 家住宿、${res.sights} 处看点`,
+        'success',
+      )
     }
   }
 
@@ -180,8 +181,8 @@ export function SettingsPage() {
             </svg>
             重新加载数据
           </button>
-          <button className="btn" onClick={handleMergeSights}>
-            合并官方默认看点
+          <button className="btn" onClick={handleSyncAssets}>
+            一键更新住宿与看点
           </button>
           <button
             className="btn btn-danger"
@@ -207,8 +208,8 @@ export function SettingsPage() {
           </button>
         </div>
         <p className="muted">
-          「重新加载数据」仅从本机重新读取（不含回写）；「合并官方默认看点」会把官方补充的知名景点
-          按 id 无损并入现有路线（已有看点不覆盖），用于本机已有旧路线、却没拿到新补看点的情况。
+          「重新加载数据」只把本机存的那份重新读一遍；「一键更新住宿与看点」会用站点当前版本的
+          住宿与看点整段写回本机 —— 官方数据有增删时点一次即可跟上，不用清空数据重新初始化。
         </p>
       </section>
 
