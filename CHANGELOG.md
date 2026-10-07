@@ -3,6 +3,37 @@
 > **README 只留「现在该怎么用」的最终结论**；本文件记录过程 —— 为什么这么改、试错过什么、每个时间点的历史数据快照。
 >
 
+## 2026-10-07
+
+### 清掉「脚本抓取」的住宿条目（删除 854 / 970 条）
+
+**用户口径**：`src/data/stays.json` 里凡是**同时没有中文名和英文名**的条目（即脚本从 OSM / Overpass
+抓来、没有人工给过名字的那批），全部删掉。**只删数据，抓取脚本一律保留**。
+
+**判定规则**：`nameZh` 与 `nameEn` 均为空（null 或空串）→ 删；只要有一个非空就保留。
+删除 854 条，保留 116 条（人工补录 21 条 + 已带中英文名的抓取 / TourAPI 条目）。
+
+**做法**：新增 `scripts/drop_scraped_stays.py`（`--dry-run` 可先看会删多少，幂等）。
+直接从 `towns[].hotels` 里移除，并同步 `town.count = len(hotels)`（源头 `fetch_stays.py` 就是这个口径，
+不让它和实际条数对不上）。顶层留一条 `_dropped`（规则 / 数量 / 时间 / 还原命令）。
+
+**还原**：`git checkout -- src/data/stays.json`；抓取脚本都还在，也可以重跑 `fetch_stays*.py` 重新生成全量。
+保留的脚本：`fetch_stays.py`（OSM / Overpass）、`fetch_stays_tourapi.py`、`fetch_stays_kakao.py`
+、`fetch_stays_manual.py`（人工补录入口）。
+
+**试错两轮（都是我理解偏了口径）**：
+1. 第一版做成「条目移出 `hotels`、原文存进 `_commentedHotels`」—— 用户：*「我让你注释，没让你删除」*。
+   确实，原位置空了，在他眼里就是删除。
+2. 第二版改成真行注释（原地 `// {...}`，前端加 `jsonc.ts` + `?raw` 导入来剥注释）—— 用户随后改主意：
+   *「还是按照原计划删除 json 里的数据吧，但是原来爬取酒店列表的脚本还是保留」*。
+   于是行注释方案整体回滚（`src/lib/jsonc.ts`、`test/jsonc.test.ts`、`comment_out_stays.py` 已删，
+   `seedStays.ts` / `DataContext.tsx` 回到直接 import），最终按真删除落地。
+
+**收益**：`dist/assets/index.js` 575 KB → **282 KB**（gzip 154 → 115 KB）。
+
+**影响**：추자도（楸子岛）27 条全被删 → 该镇住宿池为 0，路线 **18-1 / 18-2** 的住宿列表为空。
+要补回楸子岛，往 `scripts/data/curated_stays.json` 里人工加条目再跑 `fetch_stays_manual.py`。
+
 ## 2026-10-05
 
 ### 修：「需住宿 N 晚」在行程单上变成 N+1 晚
