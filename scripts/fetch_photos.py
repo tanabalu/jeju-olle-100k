@@ -159,6 +159,12 @@ JUNK_RE = re.compile(
     r"|poster|flag|coat of arms|ganse)\b|안내판|표지판|간세",
     re.I,
 )
+# 「A 在 B 前面」式的构图：主体是花草，景点只是背景板。2026-10-17 给城山日出峰选图时，
+# 第一条命中就是 "Hydrangea macrophylla in front of Seongsan Ilchulbong volcano"——
+# 画面主体是绣球花，日出峰只是远景。同类写法一律排除，宁可换下一条候选。
+FRONT_OF_RE = re.compile(
+    r"\b(in front of|with .* in (?:the )?(?:background|back)|foreground)\b", re.I
+)
 # 只接受明确自由许可；拿不到许可字段的一律不要
 FREE_RE = re.compile(r"(cc0|public domain|pd-|cc by|cc-by|cc_by)", re.I)
 BAD_RE = re.compile(r"(fair use|non-free|nonfree|all rights reserved|© all)", re.I)
@@ -290,6 +296,8 @@ def search(opener, keyword: str, width: int, code=None, used=None, sleep: float 
             continue  # 许可不明或非自由 → 直接不要，宁可这条线没封面
         if JUNK_RE.search(title):
             continue
+        if FRONT_OF_RE.search(title):
+            continue  # 「A in front of B」构图：主体是花草，景点只当背景 → 不算这个景点的照片
         if w < 1200 or w / max(h, 1) < ASPECT_MIN:
             continue  # 要明显横构图，近方形/竖图当封面会被裁得看不出是什么
         if code and not route_num_ok(title, code):
