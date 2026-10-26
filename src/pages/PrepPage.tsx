@@ -449,6 +449,13 @@ export function PrepPage() {
                         </div>
                       </div>
                     {item.note && <p className={`${styles['check-note']}`}>{item.note}</p>}
+                    {item.link && (
+                      <p className={`${styles['check-link']}`}>
+                        <a href={item.link.url} target="_blank" rel="noreferrer">
+                          {item.link.label} · {item.link.url.replace(/^https?:\/\//, '')}
+                        </a>
+                      </p>
+                    )}
                     {/* 图文教程就地展开：展开在条目下方，再点一次收起 */}
                     {tutorial && tutorialOpen && (
                       <div className={`${styles['tut-inline']}`}>

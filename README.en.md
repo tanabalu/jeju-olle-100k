@@ -284,7 +284,7 @@ When the script isn't run the album is empty, interface shows "no image" placeho
 
 `/prep` content references the Olle trail official site (jejuolle.org), Korea Tourism Organization public materials, and public travelogues, compiled 2026-09, written in `src/lib/prep.ts`.
 
-- **Policy items marked "verify before departure"** (red small tag): visa waiver caliber, whether K-ETA is required, IDP car rental, emergency phone may change, confirm again before departure.
+- **Policy items marked "verify before departure"** (red small tag): visa waiver caliber, IDP car rental, emergency phone may change, confirm again before departure.
 - **The Olle passport is NOT a verify item**: it's a booklet bought on the ground after arriving in Jeju (tourist centers / shops near trail starts, about ₩20,000, bring cash); the price is whatever it is on site, no need to check before departure.
 - **Prices are only common ranges**, for budget estimation, subject to booking platform and store real-time info.
 - **No specific store or hotel names** — unverified names aren't invented, check reviews on Kakao Maps / Naver Maps yourself.

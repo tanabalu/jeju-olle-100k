@@ -2,7 +2,7 @@
  * 济州岛行前准备：checklist 骨架 + 吃喝住行速查。
  *
  * ⚠️ 数据边界（诚实说明，别当权威攻略用）：
- * - 政策类（免签、K-ETA、IDP）多次调整，标了 verify 的项**必须临行前自己复核**；
+ * - 政策类（免签、K-EAC、IDP）多次调整，标了 verify 的项**必须临行前自己复核**；
  * - 价格是公开攻略里的常见区间，随店、随季节浮动，只用来估算预算，不作承诺；
  * - 不推荐具体店名与酒店名 —— 没核实过的名字不写，请自己在 Kakao/Naver 地图上看实时评价。
  * - 公交与支付的「操作细节」（开卡费、换乘口径、STOP 铃、iOS 开卡限制、Uber 当面付等）来自
@@ -15,6 +15,8 @@ export interface PrepItem {
   text: string
   /** 补充说明（小字） */
   note?: string
+  /** 官方办理入口（只放链接不转载内容），渲染在说明下方 */
+  link?: GuideSource
   /** true = 政策/时效性强，临行前必须自行复核 */
   verify?: boolean
 }
@@ -46,10 +48,10 @@ export const PREP_GROUPS: PrepGroup[] = [
         verify: true,
       },
       {
-        id: 'docs.keta',
-        text: '确认是否需要 K-ETA（电子旅行许可）',
-        note: 'K-ETA 对部分免签入境者有临时免除措施，且屡次延期，结论会变。以 K-ETA 官网 + 航司地勤口径为准。',
-        verify: true,
+        id: 'docs.keac',
+        text: '填写 K-EAC（电子入境申报单）',
+        note: '落地后只交护照就行，申报记录在海关系统里，他自己会查，不用打印、也不用截图。走纸质的话得在现场把单子填好，再连护照一起递过去 —— 电子申报省的就是这一步。抵达前 3 天内提交，免费，需护照信息、出入境航班号与在韩住址。济州免签入境同样要填；K-ETA（电子旅行许可）是另一套东西，持大陆护照走济州免签不需要。',
+        link: { label: 'K-EAC 官网（唯一官方入口）', url: 'https://www.e-arrivalcard.go.kr' },
       },
       { id: 'docs.booking', text: '住宿预订单 + 行程单（纸质或截图保存）', note: '入境抽查时可能要看，手机没网也能翻出来。' },
       { id: 'docs.insurance', text: '旅行保险，含户外徒步与医疗运送' },
